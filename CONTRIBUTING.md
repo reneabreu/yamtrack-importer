@@ -52,18 +52,33 @@ contacted at runtime, and tests stub them.
 
 ## Project layout
 
+The app is a **canonical import/export pipeline**: sources produce neutral
+`MediaItem`s, a resolution layer fills in the ids the chosen exporter needs, and
+exporters write the destination's format. Sources and exporters are independent
+plugins — add or remove one without touching the rest.
+
 ```
-yamtrack_importer/        # core package
-  parse.py                # TV Time export parsing
-  resolve.py / mal.py     # TMDB / MyAnimeList (Jikan) resolvers
-  build_records.py        # -> Yamtrack rows (CSV + API shape)
-  pipeline.py             # parse -> resolve -> rows, with anime rerouting
-  api_client.py           # Yamtrack REST client
-  crunchyroll.py          # Crunchyroll watch-history client
-  sources/                # source plugins + registry
-webapp/                   # Flask UI (routes, jobs, templates)
-migrate.py                # CLI entry point
+yamtrack_importer/
+  core/
+    model.py            # canonical MediaItem / Status / EpisodeWatch
+    resolve_service.py  # enrich items with exporter-required ids (TMDB/MAL)
+    pipeline.py         # source -> resolve -> exporter; builds report/details
+  sources/              # IMPORT modules: Source.fetch() -> [MediaItem]  (+ registry)
+    tvtime.py, crunchyroll.py
+  exporters/            # EXPORT modules: consume [MediaItem]  (+ registry)
+    yamtrack.py         # canonical -> Yamtrack rows (CSV/API)
+  resolve.py / mal.py   # provider clients (TMDB, MyAnimeList via Jikan)
+  parse.py              # TV Time export parsing
+  crunchyroll.py        # Crunchyroll watch-history client
+webapp/                 # Flask UI (routes, jobs, templates)
+migrate.py              # CLI entry point
 ```
+
+- **Add a source**: subclass `Source`, implement `fetch(inputs, options, progress)
+  -> list[MediaItem]`, register in `sources/registry.py`.
+- **Add an exporter**: subclass `Exporter`, declare `requires` (media_type → id
+  provider) and `media_types`, implement `build()/write_csv()/push()`, register
+  in `exporters/registry.py`.
 
 ## Adding a source
 

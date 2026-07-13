@@ -19,6 +19,18 @@ Still possible later:
 - Prefer a dedicated anime source (Crunchyroll — done; later MAL/AniList export)
   where the data is already anime-native.
 
+## Architecture — canonical import/export core ✅
+
+The project is a neutral pipeline, not a Yamtrack-only tool:
+
+- **Import modules** (`sources/`) produce canonical `MediaItem`s.
+- A **resolution layer** enriches items with the ids the chosen exporter needs.
+- **Export modules** (`exporters/`) write the destination's format.
+
+Yamtrack is the first exporter. Others (Trakt, Simkl, plain JSON, or a
+home-grown tracker) can be added as exporters without touching sources — the
+foundation for making this the base of a larger media-tracking system.
+
 ## Sources
 
 | Source | Status | Yamtrack type | Matching |
