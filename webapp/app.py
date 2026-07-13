@@ -26,6 +26,7 @@ from flask import (
 )
 
 from yamtrack_importer.api_client import YamtrackClient
+from yamtrack_importer.build_records import summarize_rows
 from yamtrack_importer.csv_writer import write_csv
 from yamtrack_importer.resolvers import get_resolver
 from yamtrack_importer.sources.registry import all_sources, get_source
@@ -222,6 +223,7 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
         source.info.metadata_provider, settings, config.CACHE_PATH, config.OVERRIDES_PATH
     )
     rows, report = source.build(files, resolver, options, progress=job.emit)
+    report["details"] = summarize_rows(rows)  # per-title review data
 
     if mode == "csv":
         out_path = os.path.join(work_dir, f"{source.info.id}_yamtrack_import.csv")

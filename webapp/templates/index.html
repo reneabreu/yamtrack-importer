@@ -1,7 +1,7 @@
 {% extends "base.html" %}
+{% set active = 'migrate' %}
+{% set tmdb_ok = has_tmdb %}
 {% block body %}
-<h1>Migrate to Yamtrack</h1>
-<p class="sub">Convert data from another service into your Yamtrack library.</p>
 
 {% if not has_tmdb %}
   <div class="flash err">
@@ -10,29 +10,61 @@
   </div>
 {% endif %}
 
-<form id="migrate-form" method="post" action="{{ url_for('start') }}" enctype="multipart/form-data">
-  <div class="cols">
+<div id="wizard">
+  <!-- stepper -->
+  <div class="stepper" id="stepper">
+    <div class="stp" data-for="1"><span class="dot">1</span><span class="lbl">Source</span></div>
+    <div class="ln"></div>
+    <div class="stp" data-for="2"><span class="dot">2</span><span class="lbl">Connect</span></div>
+    <div class="ln"></div>
+    <div class="stp" data-for="3"><span class="dot">3</span><span class="lbl">Output</span></div>
+  </div>
 
-    <!-- 1 · Source -->
-    <div class="card col">
-      <h3><span class="step">1</span> Source</h3>
-      <div class="src-list single">
-        {% for s in sources %}
-          <label class="src {{ 'planned' if not s.status == 'ready' else '' }}">
-            <input type="radio" name="source" value="{{ s.id }}"
-                   {{ 'disabled' if s.status != 'ready' }}
-                   {{ 'checked' if s.status == 'ready' and loop.first }}>
-            <span class="name">{{ s.label }}</span>
-            <span class="pill {{ 'ready' if s.status == 'ready' }}">{{ s.status }}</span>
-            <div class="note">{{ s.note }}</div>
+  <form id="migrate-form" method="post" action="{{ url_for('start') }}" enctype="multipart/form-data">
+
+    <!-- ===== STEP 1 · SOURCE ===== -->
+    <section class="step" data-step="1">
+      <div class="eyebrow">Step 1 of 3</div>
+      <h2>Where are you migrating from?</h2>
+      <p class="sub">Pick the service you're exporting. Ready sources import directly; planned ones are on the roadmap.</p>
+
+      <div class="eyebrow" style="margin-bottom:10px">Ready now</div>
+      <div class="src-grid">
+        {% for s in sources if s.status == 'ready' %}
+          <label class="src">
+            <input type="radio" name="source" value="{{ s.id }}" {{ 'checked' if loop.first }}>
+            <span class="ic">{{ s.label[:2]|upper }}</span>
+            <span class="meta">
+              <span class="name">{{ s.label }}
+                {% if s.status == 'ready' and s.beta %}<span class="tag">beta</span>{% endif %}
+              </span>
+              <span class="note">{{ s.note }}</span>
+            </span>
+            <span class="check"></span>
           </label>
         {% endfor %}
       </div>
-    </div>
 
-    <!-- 2 · Your data -->
-    <div class="card col">
-      <h3><span class="step">2</span> Your data</h3>
+      {% set planned = sources | selectattr('status', 'ne', 'ready') | list %}
+      {% if planned %}
+      <div class="eyebrow" style="margin:22px 0 10px;color:var(--dim)">Planned</div>
+      <div class="chips">
+        {% for s in planned %}<span class="chip">{{ s.label }}</span>{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="nav">
+        <span class="hint" id="src-hint">Nothing uploaded yet</span>
+        <button type="button" class="next">Continue →</button>
+      </div>
+    </section>
+
+    <!-- ===== STEP 2 · YOUR DATA ===== -->
+    <section class="step" data-step="2" hidden>
+      <div class="eyebrow">Step 2 of 3</div>
+      <h2>Connect your data</h2>
+      <p class="sub">Upload the export from your chosen source. Nothing leaves your machine except title lookups.</p>
+
       {% for s in sources if s.status == 'ready' %}
       <div class="source-inputs" id="inputs-{{ s.id }}" data-include="{{ '1' if s.has_include_options else '0' }}">
         {% for inp in s.inputs %}
@@ -58,85 +90,204 @@
         {% endif %}
 
         {% if s.has_include_options %}
-        <label style="margin-top:18px">Include</label>
-        <div class="checks">
-          <label><input type="checkbox" name="include_shows" checked> TV shows &amp; episodes</label>
-          <label><input type="checkbox" name="include_movies" checked> Movies</label>
-          <label><input type="checkbox" name="include_watchlist" checked> Watchlist (Planning)</label>
-          <label><input type="checkbox" name="include_ratings" checked> Ratings</label>
-          <label><input type="checkbox" name="include_anime_as_anime" checked>
-            Route anime to MyAnimeList <span class="hint">(anime import as Yamtrack anime, not TV)</span></label>
+        <label style="margin-top:20px">Include</label>
+        <div class="incl-grid">
+          <label class="incl"><input type="checkbox" name="include_shows" checked> TV shows &amp; episodes</label>
+          <label class="incl"><input type="checkbox" name="include_movies" checked> Movies</label>
+          <label class="incl"><input type="checkbox" name="include_watchlist" checked> Watchlist (Planning)</label>
+          <label class="incl"><input type="checkbox" name="include_ratings" checked> Ratings</label>
+          <label class="incl wide"><input type="checkbox" name="include_anime_as_anime" checked>
+            Route anime to MyAnimeList <span class="hint">— import as Yamtrack anime, not TV</span></label>
         </div>
         {% endif %}
       </div>
       {% endfor %}
-    </div>
 
-    <!-- 3 · Output -->
-    <div class="card col">
-      <h3><span class="step">3</span> Output</h3>
-      <div class="checks">
-        <label><input type="radio" name="mode" value="csv" checked>
-          Download a Yamtrack import CSV
-          <span class="hint">recommended — upload via Yamtrack → Settings → Import</span></label>
-        <label><input type="radio" name="mode" value="push">
-          Push directly to the Yamtrack API
-          {% if not has_yamtrack %}<span class="hint">needs Yamtrack URL + key in Settings</span>{% endif %}</label>
-        <label style="margin-left:24px"><input type="checkbox" name="dry_run">
-          Dry run <span class="hint">(push: resolve only, don’t write)</span></label>
+      <div class="nav">
+        <button type="button" class="back secondary">← Back</button>
+        <button type="button" class="next">Continue →</button>
       </div>
-      <button type="submit" id="run-btn" style="margin-top:16px;width:100%">Run migration</button>
+    </section>
+
+    <!-- ===== STEP 3 · OUTPUT ===== -->
+    <section class="step" data-step="3" hidden>
+      <div class="eyebrow">Step 3 of 3</div>
+      <h2>Where should it go?</h2>
+      <p class="sub">Choose an output, review the run, and start the migration.</p>
+
+      <div class="mode-grid">
+        <label class="mode">
+          <span class="mode-head"><input type="radio" name="mode" value="csv" checked> Download CSV</span>
+          <span class="hint">Recommended — upload via Yamtrack → Settings → Import</span>
+        </label>
+        <label class="mode">
+          <span class="mode-head"><input type="radio" name="mode" value="push"> Push to API</span>
+          <span class="hint">Direct import to your instance{% if not has_yamtrack %} — needs URL + key in Settings{% endif %}</span>
+        </label>
+      </div>
+      <label class="dry"><input type="checkbox" name="dry_run">
+        Dry run <span class="hint">(push: resolve only, don't write)</span></label>
+
+      <div class="review">
+        <div class="eyebrow" style="margin-bottom:10px">Review</div>
+        <div class="rrow"><span class="hint">Source</span><b id="rv-source">—</b></div>
+        <div class="rrow"><span class="hint">Output</span><b id="rv-mode">CSV file</b></div>
+      </div>
+
+      <div class="nav">
+        <button type="button" class="back secondary">← Back</button>
+        <button type="submit" id="run-btn">Run migration</button>
+      </div>
+    </section>
+  </form>
+
+  <!-- ===== PROGRESS PANEL (running state) ===== -->
+  <div class="card" id="progress-panel" style="display:none">
+    <div class="run-head">
+      <span class="spinner" id="spinner"></span>
+      <div>
+        <div class="run-title" id="phase-label">Starting…</div>
+        <div class="hint" id="run-sub">Preparing the migration</div>
+      </div>
+      <span class="mono run-count" id="count-label"></span>
     </div>
-
-  </div>
-</form>
-
-<div class="card" id="progress-panel" style="display:none">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <label style="margin:0" id="phase-label">Starting…</label>
-    <span class="hint" id="count-label"></span>
-  </div>
-  <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
-  <pre id="log" class="log"></pre>
-  <div id="done-actions" style="display:none;margin-top:12px">
-    <a class="btn" id="download-link" href="#" style="display:none">Download CSV</a>
-    <a class="btn" id="result-link" href="#">View summary</a>
-    <button type="button" class="secondary" onclick="location.reload()">Run another</button>
+    <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+    <pre id="log" class="log mono"></pre>
+    <div id="done-actions" style="display:none;margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" id="download-link" href="#" style="display:none">↓ Download CSV</a>
+      <a class="btn" id="result-link" href="#">View summary</a>
+      <button type="button" class="secondary" onclick="location.reload()">Run another</button>
+    </div>
   </div>
 </div>
 
 <style>
-  .cols{display:grid;grid-template-columns:1.1fr 1.2fr 1fr;gap:16px;align-items:start}
-  @media (max-width:920px){ .cols{grid-template-columns:1fr} }
-  .col h3{margin:0 0 14px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;
-    color:var(--mut);font-weight:700}
-  .col h3 .step{display:inline-flex;align-items:center;justify-content:center;
-    width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;
-    font-size:11px;margin-right:8px}
-  .col .src-list.single{grid-template-columns:1fr;gap:8px;max-height:600px;overflow:auto;
-    padding-right:4px}
-  .bar{height:10px;background:var(--card2);border:1px solid var(--line);
-    border-radius:6px;overflow:hidden;margin:12px 0}
-  .bar-fill{height:100%;width:0;background:var(--accent);transition:width .2s}
-  .bar-fill.push{background:var(--ok)}
-  .log{background:#0b0d11;border:1px solid var(--line);border-radius:8px;
-    padding:12px;max-height:280px;overflow:auto;font-size:12.5px;color:#c7d0dd;
-    white-space:pre-wrap;margin:0}
-  .log .warn{color:#f0c674}
+  /* stepper */
+  .stepper{display:flex;align-items:center;max-width:720px;margin:0 auto 34px}
+  .stp{display:flex;align-items:center;gap:10px}
+  .stp .dot{width:26px;height:26px;border-radius:50%;background:var(--card2);
+    border:1px solid var(--line3);color:var(--mut);font-weight:700;font-size:13px;
+    display:flex;align-items:center;justify-content:center}
+  .stp .lbl{font-size:13.5px;color:var(--mut)}
+  .stp.active .dot{background:var(--accent);border-color:var(--accent);color:#fff}
+  .stp.active .lbl{color:var(--txt);font-weight:700}
+  .stp.done .dot{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+  .stp.done .lbl{color:var(--mut);font-weight:600}
+  .stepper .ln{flex:1;height:2px;background:var(--line2);margin:0 14px}
+  .stepper .ln.done{background:var(--ok)}
+
+  #wizard{max-width:760px;margin:0 auto}
+  .step h2{margin-top:0}
+  .nav{display:flex;align-items:center;justify-content:space-between;
+    border-top:1px solid var(--line);padding-top:22px;margin-top:30px}
+
+  /* source tiles */
+  .src-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .src{display:flex;align-items:center;gap:12px;background:var(--card2);
+    border:1px solid var(--line2);border-radius:12px;padding:14px;cursor:pointer;margin:0}
+  .src:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+  .src input{position:absolute;opacity:0;pointer-events:none}
+  .src .ic{width:40px;height:40px;border-radius:9px;flex:none;display:flex;
+    align-items:center;justify-content:center;font-weight:700;color:#c9b6ff;
+    background:linear-gradient(140deg,#2b2140,#3a2a5c);border:1px solid #4a3a6e}
+  .src .meta{flex:1;min-width:0;display:flex;flex-direction:column}
+  .src .name{font-weight:600}
+  .src .tag{font-family:var(--mono);font-size:10px;color:var(--mut);
+    border:1px solid var(--line3);border-radius:5px;padding:1px 5px;margin-left:4px}
+  .src .note{color:var(--mut);font-size:12.5px}
+  .src .check{width:18px;height:18px;border-radius:50%;flex:none;border:1px solid var(--line3)}
+  .src:has(input:checked) .check{background:var(--accent);border-color:var(--accent);
+    position:relative}
+  .src:has(input:checked) .check::after{content:"✓";color:#fff;font-size:11px;
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--card2);border:1px solid var(--line2);border-radius:20px;
+    padding:6px 12px;font-size:13px;opacity:.55}
+
+  /* include grid */
+  .incl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .incl{display:flex;align-items:center;gap:10px;background:var(--card2);
+    border:1px solid var(--line2);border-radius:10px;padding:11px 13px;
+    font-weight:400;margin:0;cursor:pointer}
+  .incl input{width:auto;accent-color:var(--accent)}
+  .incl.wide{grid-column:1 / -1}
+
+  /* output modes */
+  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .mode{display:flex;flex-direction:column;gap:5px;background:var(--card2);
+    border:1px solid var(--line2);border-radius:12px;padding:14px 15px;cursor:pointer;margin:0}
+  .mode:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
+  .mode-head{display:flex;align-items:center;gap:9px;font-weight:600}
+  .mode-head input{width:auto;accent-color:var(--accent)}
+  .mode .hint{padding-left:24px}
+  .dry{display:flex;align-items:center;gap:9px;font-weight:400;color:var(--mut);
+    font-size:13px;margin:0 0 22px;cursor:pointer}
+  .dry input{width:auto;accent-color:var(--accent)}
+  .review{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px}
+  .rrow{display:flex;justify-content:space-between;font-size:14px;padding:5px 0}
+  .rrow+.rrow{border-top:1px solid var(--card2)}
+
+  /* running state */
+  .run-head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+  .run-head>div:nth-child(2){flex:1}
+  .run-title{font-weight:700;font-size:18px}
+  .run-count{font-size:13px;color:var(--mut)}
+  .spinner{width:30px;height:30px;border-radius:50%;flex:none;
+    border:3px solid var(--line2);border-top-color:var(--accent);
+    animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bar{height:10px;background:var(--card2);border:1px solid var(--line2);
+    border-radius:6px;overflow:hidden;margin:0 0 18px}
+  .bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent-b));
+    transition:width .2s}
+  .bar-fill.push{background:linear-gradient(90deg,var(--ok),#5fd88f)}
+  .log{background:#0a0c0f;border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;max-height:280px;overflow:auto;font-size:12.5px;line-height:1.8;
+    color:#c7d0dd;white-space:pre-wrap;margin:0}
+  .log .warn{color:var(--warn)}
   .log .err{color:var(--err)}
+
+  @media (max-width:720px){
+    .src-grid,.incl-grid,.mode-grid{grid-template-columns:1fr}
+    .stp .lbl{display:none}
+  }
 </style>
 
 <script>
 (function () {
   const form = document.getElementById('migrate-form');
-  const panel = document.getElementById('progress-panel');
-  const bar = document.getElementById('bar-fill');
-  const phaseLabel = document.getElementById('phase-label');
-  const countLabel = document.getElementById('count-label');
-  const log = document.getElementById('log');
-  const runBtn = document.getElementById('run-btn');
-  const doneActions = document.getElementById('done-actions');
-  const resultLink = document.getElementById('result-link');
+  const wizard = document.getElementById('wizard');
+  const steps = [...wizard.querySelectorAll('.step')];
+  const stepper = document.getElementById('stepper');
+  const stps = [...stepper.querySelectorAll('.stp')];
+  const lns = [...stepper.querySelectorAll('.ln')];
+  let cur = 1;
+
+  function render() {
+    steps.forEach(s => { s.hidden = (+s.dataset.step !== cur); });
+    stps.forEach(s => {
+      const n = +s.dataset.for;
+      s.classList.toggle('active', n === cur);
+      s.classList.toggle('done', n < cur);
+    });
+    lns.forEach((l, i) => l.classList.toggle('done', i + 1 < cur));
+    if (cur === 3) fillReview();
+    window.scrollTo({ top: 0 });
+  }
+  function go(n) { cur = Math.max(1, Math.min(3, n)); render(); }
+
+  wizard.querySelectorAll('.next').forEach(b => b.addEventListener('click', () => go(cur + 1)));
+  wizard.querySelectorAll('.back').forEach(b => b.addEventListener('click', () => go(cur - 1)));
+  stps.forEach(s => s.addEventListener('click', () => { const n = +s.dataset.for; if (n < cur) go(n); }));
+
+  function fillReview() {
+    const sel = form.querySelector('input[name="source"]:checked');
+    const name = sel ? sel.closest('.src').querySelector('.name').textContent.trim() : '—';
+    document.getElementById('rv-source').textContent = name;
+    const mode = form.querySelector('input[name="mode"]:checked');
+    document.getElementById('rv-mode').textContent = (mode && mode.value === 'push') ? 'Push to API' : 'CSV file';
+  }
 
   // Show only the selected source's input block.
   function syncSourceInputs() {
@@ -146,10 +297,21 @@
       el.style.display = (el.id === 'inputs-' + id) ? '' : 'none';
     });
   }
-  form.querySelectorAll('input[name="source"]').forEach(function (r) {
-    r.addEventListener('change', syncSourceInputs);
-  });
+  form.querySelectorAll('input[name="source"]').forEach(r => r.addEventListener('change', syncSourceInputs));
   syncSourceInputs();
+  render();
+
+  // ---- progress / SSE (unchanged contract) ----
+  const panel = document.getElementById('progress-panel');
+  const bar = document.getElementById('bar-fill');
+  const phaseLabel = document.getElementById('phase-label');
+  const runSub = document.getElementById('run-sub');
+  const countLabel = document.getElementById('count-label');
+  const log = document.getElementById('log');
+  const runBtn = document.getElementById('run-btn');
+  const doneActions = document.getElementById('done-actions');
+  const resultLink = document.getElementById('result-link');
+  const spinner = document.getElementById('spinner');
 
   function addLog(msg) {
     const line = document.createElement('div');
@@ -159,26 +321,26 @@
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
   }
+  function resetBtn() { runBtn.disabled = false; runBtn.textContent = 'Run migration'; spinner.style.display = 'none'; }
 
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     runBtn.disabled = true;
     runBtn.textContent = 'Working…';
+    stepper.style.display = 'none';
+    steps.forEach(s => s.hidden = true);
     panel.style.display = 'block';
     doneActions.style.display = 'none';
+    spinner.style.display = '';
     log.textContent = '';
     bar.style.width = '0';
 
     let res;
     try {
       res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
-    } catch (err) {
-      addLog('Network error starting job: ' + err); resetBtn(); return;
-    }
+    } catch (err) { addLog('Network error starting job: ' + err); resetBtn(); return; }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.job_id) {
-      addLog('Error: ' + (data.error || res.statusText)); resetBtn(); return;
-    }
+    if (!res.ok || !data.job_id) { addLog('Error: ' + (data.error || res.statusText)); resetBtn(); return; }
 
     const es = new EventSource('/progress/' + data.job_id);
     es.onmessage = function (ev) {
@@ -190,13 +352,16 @@
         bar.style.width = pct + '%';
         bar.className = 'bar-fill' + (m.phase === 'push' ? ' push' : '');
         phaseLabel.textContent = m.phase === 'push' ? 'Pushing to Yamtrack' : 'Resolving titles';
+        runSub.textContent = m.phase === 'push' ? 'Writing entries to your instance' : 'Matching entries against TMDB';
         countLabel.textContent = m.current + ' / ' + m.total + ' (' + pct + '%)';
       } else if (m.type === 'done') {
         es.close();
         bar.style.width = '100%';
         phaseLabel.textContent = 'Complete';
+        runSub.textContent = 'Migration finished';
+        spinner.style.display = 'none';
         addLog('✓ Finished.');
-        doneActions.style.display = 'block';
+        doneActions.style.display = 'flex';
         const summary = m.summary || {};
         resultLink.textContent = 'View summary';
         resultLink.href = '/result/' + data.job_id;
@@ -205,7 +370,7 @@
           dl.href = '/download/' + data.job_id;
           dl.style.display = '';
           resultLink.className = 'btn secondary';
-          window.location = '/download/' + data.job_id;   // auto-start download
+          window.location = '/download/' + data.job_id;
         } else {
           dl.style.display = 'none';
           resultLink.className = 'btn';
@@ -214,16 +379,13 @@
         es.close();
         addLog('✗ ' + m.msg);
         phaseLabel.textContent = 'Failed';
+        runSub.textContent = 'Something went wrong';
+        spinner.style.display = 'none';
         resetBtn();
       }
     };
     es.onerror = function () { es.close(); resetBtn(); };
   });
-
-  function resetBtn() {
-    runBtn.disabled = false;
-    runBtn.textContent = 'Run migration';
-  }
 })();
 </script>
 {% endblock %}

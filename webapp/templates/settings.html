@@ -1,17 +1,23 @@
 {% extends "base.html" %}
+{% set active = 'settings' %}
 {% block body %}
 <h1>Settings</h1>
 <p class="sub">Keys are stored in the app's data volume. Leave a field blank to keep the current value.</p>
 
 <form method="post" action="{{ url_for('settings_view') }}">
   <div class="card">
-    <label>TMDB API key <span class="hint">(v3 key or v4 read token — required for TV/movies)</span></label>
-    <input type="password" name="tmdb_key"
-           placeholder="{{ masked(tmdb_key) or 'Get a free key at themoviedb.org/settings/api' }}">
+    <div class="eyebrow" style="margin-bottom:14px">TMDB · required for TV &amp; movies</div>
+    <label style="margin-top:0">TMDB API key <span class="hint">(v3 key or v4 read token)</span></label>
+    <div class="key-row">
+      <input type="password" name="tmdb_key"
+             placeholder="{{ masked(tmdb_key) or 'Get a free key at themoviedb.org/settings/api' }}">
+      {% if tmdb_key %}<span class="saved">✓ saved</span>{% endif %}
+    </div>
   </div>
 
   <div class="card">
-    <label>Yamtrack URL <span class="hint">(only for direct API push)</span></label>
+    <div class="eyebrow" style="margin-bottom:14px">Yamtrack · only for direct API push</div>
+    <label style="margin-top:0">Yamtrack URL</label>
     <input type="url" name="yamtrack_url" value="{{ yamtrack_url }}"
            placeholder="https://yamtrack.example.com">
 
@@ -20,16 +26,26 @@
     <input type="password" name="yamtrack_key"
            placeholder="{{ masked(yamtrack_key) or 'X-api-key value' }}">
 
-    <div style="margin-top:14px">
-      <button type="button" class="secondary" id="test-btn">Test Yamtrack connection</button>
-      <span id="test-result" class="hint" style="margin-left:10px"></span>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+      <button type="button" class="secondary" id="test-btn">Test connection</button>
+      <span id="test-result" class="hint"></span>
     </div>
     <span class="hint">Tests the saved values — save first if you just changed them.</span>
   </div>
 
-  <button type="submit">Save settings</button>
-  <a class="btn secondary" href="{{ url_for('index') }}" style="margin-left:8px">Back</a>
+  <div style="display:flex;gap:12px">
+    <button type="submit">Save settings</button>
+    <a class="btn secondary" href="{{ url_for('index') }}">Back</a>
+  </div>
 </form>
+
+<style>
+  .key-row{display:flex;align-items:center;gap:10px}
+  .saved{font-family:var(--mono);font-size:11.5px;color:var(--ok);white-space:nowrap;
+    background:rgba(55,193,114,.1);border:1px solid rgba(55,193,114,.35);
+    padding:6px 11px;border-radius:8px}
+  form{max-width:620px}
+</style>
 
 <script>
   document.getElementById('test-btn').addEventListener('click', async function () {

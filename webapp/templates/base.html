@@ -4,62 +4,92 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Yamtrack Importer{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root{
-      --bg:#0f1115; --card:#171a21; --card2:#1e222b; --line:#2a2f3a;
-      --txt:#e6e8ec; --mut:#9aa3b2; --accent:#4f8cff; --ok:#38c172; --err:#ef5350;
+      --bg:#08090c; --panel:#0e1013; --card:#111419; --card2:#16191f;
+      --line:#1c2027; --line2:#262b34; --line3:#323945;
+      --txt:#e9ebf0; --mut:#8891a0; --dim:#5f6875;
+      --accent:#4f8cff; --accent-soft:#182233; --accent-b:#6fa2ff;
+      --ok:#37c172; --warn:#f0c674; --err:#ff6b6b;
+      --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
     }
     *{box-sizing:border-box}
     body{margin:0;background:var(--bg);color:var(--txt);
       font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
     a{color:var(--accent);text-decoration:none}
+    a:hover{color:var(--accent-b)}
+    .mono{font-family:var(--mono)}
+
+    /* header */
     header{display:flex;align-items:center;justify-content:space-between;
-      padding:16px 24px;border-bottom:1px solid var(--line);background:var(--card)}
-    header .brand{font-weight:700;font-size:17px}
-    header nav a{margin-left:18px;color:var(--mut)}
+      padding:15px 26px;border-bottom:1px solid var(--line);background:var(--card)}
+    .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:16px}
+    .filmstrip{width:26px;height:22px;border-radius:5px;overflow:hidden;
+      background:linear-gradient(#2a2f3a,#1c2027);border:1px solid var(--line3);
+      display:flex;align-items:flex-end}
+    .filmstrip i{height:6px;width:100%;
+      background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px)}
+    header nav{display:flex;align-items:center;gap:22px;font-size:14px}
+    header nav a{color:var(--mut);padding-bottom:4px}
     header nav a:hover{color:var(--txt)}
-    main{max-width:1080px;margin:0 auto;padding:28px 24px 60px}
-    h1{font-size:22px;margin:0 0 4px}
+    header nav a.active{color:var(--txt);font-weight:600;border-bottom:2px solid var(--accent)}
+    .key-pill{font-family:var(--mono);font-size:11.5px;padding:3px 9px;border-radius:20px}
+    .key-pill.ok{color:var(--ok);background:rgba(55,193,114,.1);border:1px solid rgba(55,193,114,.35)}
+    .key-pill.no{color:var(--warn);background:rgba(240,198,116,.1);border:1px solid rgba(240,198,116,.35)}
+
+    main{max-width:1000px;margin:0 auto;padding:34px 26px 70px}
+    h1{font-size:22px;margin:0 0 3px;font-weight:700}
+    h2{font-size:22px;margin:0 0 3px;font-weight:700}
     .sub{color:var(--mut);margin:0 0 24px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
-      padding:20px 22px;margin-bottom:18px}
+
+    /* cards & controls */
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+      padding:18px 20px;margin-bottom:16px}
     label{display:block;font-weight:600;margin:14px 0 6px}
     .hint{color:var(--mut);font-weight:400;font-size:13px}
     input[type=text],input[type=url],input[type=password],select{
-      width:100%;padding:10px 12px;background:var(--card2);color:var(--txt);
-      border:1px solid var(--line);border-radius:8px;font-size:14px}
+      width:100%;padding:11px 13px;background:var(--panel);color:var(--txt);
+      border:1px solid var(--line2);border-radius:9px;font-size:14px}
+    input:focus{outline:none;border-color:var(--accent)}
     input[type=file]{width:100%;color:var(--mut);font-size:14px}
-    .row{display:flex;gap:16px;flex-wrap:wrap}
-    .row>div{flex:1;min-width:220px}
-    .checks label{display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0}
-    .checks input{width:auto}
-    button,.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;
-      padding:11px 18px;font-size:15px;font-weight:600;cursor:pointer}
-    button.secondary{background:var(--card2);border:1px solid var(--line)}
-    .flash{padding:11px 14px;border-radius:8px;margin-bottom:14px;font-size:14px}
-    .flash.ok{background:rgba(56,193,114,.15);border:1px solid var(--ok);color:#a8e6c2}
-    .flash.err{background:rgba(239,83,80,.15);border:1px solid var(--err);color:#f2b0ae}
-    .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:20px;
-      border:1px solid var(--line);color:var(--mut);margin-left:8px}
-    .pill.ready{color:var(--ok);border-color:var(--ok)}
-    .src-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .src{background:var(--card2);border:1px solid var(--line);border-radius:10px;
-      padding:12px 14px}
-    .src.planned{opacity:.55}
-    .src .name{font-weight:600}
-    .src .note{color:var(--mut);font-size:12.5px;margin-top:3px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}
-    td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-size:14px}
-    code{background:var(--card2);padding:1px 6px;border-radius:5px}
+    .checks label{display:flex;align-items:center;gap:10px;font-weight:400;margin:9px 0}
+    .checks input{width:auto;accent-color:var(--accent)}
+    button,.btn{background:var(--accent);color:#fff;border:0;border-radius:9px;
+      padding:11px 22px;font-size:14px;font-weight:600;cursor:pointer;
+      display:inline-flex;align-items:center;gap:8px;text-decoration:none}
+    button:hover,.btn:hover{background:var(--accent-b);color:#fff}
+    button.secondary,.btn.secondary{background:transparent;color:var(--mut);
+      border:1px solid var(--line2)}
+    button.secondary:hover,.btn.secondary:hover{color:var(--txt);background:transparent}
+    button.danger{background:transparent;color:var(--err);border:1px solid #3a2529}
+
+    .flash{padding:11px 14px;border-radius:9px;margin-bottom:14px;font-size:14px}
+    .flash.ok{background:rgba(55,193,114,.12);border:1px solid rgba(55,193,114,.4);color:#a8e6c2}
+    .flash.err{background:rgba(255,107,107,.1);border:1px solid rgba(255,107,107,.4);color:#f2b0ae}
+
+    /* section label */
+    .eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;
+      text-transform:uppercase;color:var(--mut)}
+
+    table{width:100%;border-collapse:collapse}
+    code{font-family:var(--mono);background:var(--card2);padding:1px 6px;border-radius:5px}
   </style>
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header>
-    <div class="brand">🎬 Yamtrack Importer</div>
+    <div class="brand"><span class="filmstrip"><i></i></span> Yamtrack Importer</div>
     <nav>
-      <a href="{{ url_for('index') }}">Migrate</a>
-      <a href="{{ url_for('history') }}">History</a>
-      <a href="{{ url_for('settings_view') }}">Settings</a>
+      <a href="{{ url_for('index') }}" class="{{ 'active' if active == 'migrate' }}">Migrate</a>
+      <a href="{{ url_for('history') }}" class="{{ 'active' if active == 'history' }}">History</a>
+      <a href="{{ url_for('settings_view') }}" class="{{ 'active' if active == 'settings' }}">Settings</a>
+      {% if tmdb_ok is defined %}
+        {% if tmdb_ok %}<span class="key-pill ok">TMDB key ✓</span>
+        {% else %}<span class="key-pill no">No TMDB key</span>{% endif %}
+      {% endif %}
     </nav>
   </header>
   <main>

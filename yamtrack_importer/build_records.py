@@ -202,6 +202,65 @@ def rows_for_anime(anime: AnimeRecord) -> list[dict]:
     ]
 
 
+def _to_int(value) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def summarize_rows(rows: list[dict]) -> list[dict]:
+    """Collapse the flat Yamtrack rows into one review entry per title.
+
+    Used by the result page so you can see exactly what was captured: series
+    with seasons/episodes watched and total rewatches, movies, and anime with
+    their progress — plus status, score, and last-watched date.
+    """
+    shows: dict[str, dict] = {}
+    out: list[dict] = []
+    for r in rows:
+        mt = r.get("media_type")
+        if mt in ("tv", "season", "episode"):
+            g = shows.get(r["media_id"])
+            if g is None:
+                g = {
+                    "type": "tv", "title": r["title"], "media_id": r["media_id"],
+                    "_seasons": set(), "episodes": 0, "rewatches": 0,
+                    "status": "", "score": "", "last": "",
+                }
+                shows[r["media_id"]] = g
+                out.append(g)
+            if mt == "tv":
+                g["status"] = r.get("status", "")
+                g["score"] = r.get("score", "")
+            elif mt == "season":
+                g["_seasons"].add(r.get("season_number"))
+            elif mt == "episode":
+                g["episodes"] += 1
+                g["rewatches"] += _to_int(r.get("repeats"))
+                d = r.get("end_date") or ""
+                if d > g["last"]:
+                    g["last"] = d
+        elif mt == "movie":
+            out.append({
+                "type": "movie", "title": r["title"], "media_id": r["media_id"],
+                "seasons": "", "episodes": "", "rewatches": _to_int(r.get("repeats")),
+                "status": r.get("status", ""), "score": r.get("score", ""),
+                "last": r.get("end_date") or "",
+            })
+        elif mt == "anime":
+            out.append({
+                "type": "anime", "title": r["title"], "media_id": r["media_id"],
+                "seasons": "", "episodes": r.get("progress") or "", "rewatches": "",
+                "status": r.get("status", ""), "score": r.get("score", ""),
+                "last": r.get("end_date") or r.get("start_date") or "",
+            })
+    for g in shows.values():
+        g["seasons"] = len(g.pop("_seasons"))
+    out.sort(key=lambda x: (x["type"], str(x["title"]).lower()))
+    return out
+
+
 CSV_COLUMNS = [
     "media_id",
     "source",

@@ -1,29 +1,49 @@
 {% extends "base.html" %}
+{% set active = 'history' %}
 {% block body %}
 <h1>Run history</h1>
-<p class="sub">Past migrations, newest first. Re-open a summary or re-download its CSV
-without reprocessing.</p>
+<p class="sub">Past migrations, newest first. Re-open a summary or re-download its CSV without reprocessing.</p>
 
 {% if not records %}
-  <div class="card"><span class="hint">No runs yet.</span></div>
+  <div class="empty">
+    <div class="empty-ic">🎬</div>
+    <div style="font-weight:600;margin-bottom:4px">No runs yet</div>
+    <div class="hint">Your migrations will show up here once you run one.</div>
+    <a class="btn" href="{{ url_for('index') }}" style="margin-top:16px">Start a migration</a>
+  </div>
 {% else %}
-<div class="card">
-  <table>
-    <tr><th>When</th><th>Source</th><th>Mode</th><th>Rows</th><th>Matched</th><th></th></tr>
-    {% for r in records %}
-    <tr>
-      <td>{{ r.when }}</td>
-      <td>{{ r.source }}</td>
-      <td>{{ r.mode }}</td>
-      <td>{{ r.rows }}</td>
-      <td>{{ r.matched }}/{{ r.total }}</td>
-      <td>
-        <a href="{{ url_for('result', job_id=r.id) }}">Summary</a>
-        {% if r.has_csv %} · <a href="{{ url_for('download', job_id=r.id) }}">CSV</a>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+<div class="tbl">
+  <div class="tr th"><span>When</span><span>Source</span><span>Mode</span><span>Rows</span><span>Matched</span><span></span></div>
+  {% for r in records %}
+  <div class="tr">
+    <span class="mono" style="font-size:12.5px;color:#c7d0dd">{{ r.when }}</span>
+    <span style="font-weight:600">{{ r.source }}</span>
+    <span><span class="mode-tag {{ 'push' if r.mode|lower == 'push' else 'csv' }}">{{ r.mode }}</span></span>
+    <span class="mono">{{ r.rows }}</span>
+    <span class="mono" style="color:{{ 'var(--ok)' if r.matched == r.total else 'var(--warn)' }}">{{ r.matched }}/{{ r.total }}</span>
+    <span class="acts">
+      <a href="{{ url_for('result', job_id=r.id) }}">Summary</a>
+      {% if r.has_csv %}<a href="{{ url_for('download', job_id=r.id) }}">CSV</a>{% endif %}
+    </span>
+  </div>
+  {% endfor %}
 </div>
 {% endif %}
+
+<style>
+  .tbl{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .tr{display:grid;grid-template-columns:170px 1fr 90px 80px 100px 130px;gap:10px;
+    padding:13px 16px;align-items:center;font-size:13.5px;border-top:1px solid var(--card2)}
+  .tr:first-child{border-top:0}
+  .tr.th{background:var(--card2);font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--mut)}
+  .mode-tag{font-size:11.5px;border-radius:5px;padding:2px 8px}
+  .mode-tag.csv{background:rgba(79,140,255,.12);color:#8fb4ff}
+  .mode-tag.push{background:rgba(55,193,114,.12);color:var(--ok)}
+  .acts{display:flex;gap:10px}
+  .empty{text-align:center;padding:56px 20px;background:var(--card);
+    border:1px solid var(--line);border-radius:14px}
+  .empty-ic{font-size:34px;margin-bottom:12px;opacity:.8}
+  @media (max-width:720px){ .tr{grid-template-columns:1fr 1fr;row-gap:6px} .tr.th{display:none} }
+</style>
 {% endblock %}

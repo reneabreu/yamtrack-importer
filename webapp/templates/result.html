@@ -1,85 +1,191 @@
 {% extends "base.html" %}
+{% set active = 'migrate' %}
 {% block body %}
-<h1>Migration summary</h1>
-<p class="sub">
-  {% if mode == 'csv' %}CSV generated.
-  {% elif push and push.dry_run %}Dry run — nothing was written.
-  {% else %}Push complete.{% endif %}
-</p>
 
-<div class="card">
-  <table>
-    <tr><th>Shows matched</th><td>{{ report.shows_matched }} / {{ report.shows_total }}</td></tr>
-    <tr><th>Movies matched</th><td>{{ report.movies_matched }} / {{ report.movies_total }}</td></tr>
-    <tr><th>Rows generated</th><td>{{ report.rows }} — {{ report.row_counts_by_type }}</td></tr>
-    {% if report.anime_rerouted %}
-    <tr><th>Anime → MyAnimeList</th><td>{{ report.anime_rerouted }}</td></tr>
-    {% endif %}
-    {% if report.episodes_skipped %}
-    <tr><th>Episodes skipped</th><td>{{ report.episodes_skipped }} (TVDB↔TMDB numbering)</td></tr>
-    {% endif %}
-    {% if push %}
-    <tr><th>Created</th><td>{{ push.created }}</td></tr>
-    <tr><th>Skipped (already present)</th><td>{{ push.skipped }}</td></tr>
-    <tr><th>Failed</th><td>{{ push.failed }}</td></tr>
-    {% endif %}
-  </table>
-  {% if download %}
-    <a class="btn" href="{{ url_for('download', job_id=job_id) }}" style="margin-top:14px">Download CSV</a>
+<div class="result-head">
+  <span class="ok-badge">✓</span>
+  <div>
+    <h2>Migration complete</h2>
+    <p class="sub" style="margin:0">
+      {% if mode == 'csv' %}CSV generated — {{ report.rows }} rows ready to import into Yamtrack.
+      {% elif push and push.dry_run %}Dry run — nothing was written.
+      {% else %}Push complete — written to your Yamtrack instance.{% endif %}
+    </p>
+  </div>
+</div>
+
+<!-- stat cards -->
+<div class="stats">
+  <div class="stat"><div class="num mono">{{ report.shows_matched }}<span class="of">/{{ report.shows_total }}</span></div><div class="lbl">Shows matched</div></div>
+  <div class="stat"><div class="num mono">{{ report.movies_matched }}<span class="of">/{{ report.movies_total }}</span></div><div class="lbl">Movies matched</div></div>
+  {% if report.anime_rerouted %}
+  <div class="stat"><div class="num mono" style="color:#c9b6ff">{{ report.anime_rerouted }}</div><div class="lbl">Anime → MyAnimeList</div></div>
+  {% endif %}
+  <div class="stat"><div class="num mono">{{ report.rows }}</div><div class="lbl">Rows generated</div></div>
+  {% if push %}
+  <div class="stat"><div class="num mono" style="color:var(--ok)">{{ push.created }}</div><div class="lbl">Created</div></div>
+  <div class="stat"><div class="num mono">{{ push.skipped }}</div><div class="lbl">Skipped (present)</div></div>
+  {% if push.failed %}<div class="stat"><div class="num mono" style="color:var(--err)">{{ push.failed }}</div><div class="lbl">Failed</div></div>{% endif %}
   {% endif %}
 </div>
 
-{% if report.numbering_mismatches %}
-<div class="card">
-  <label>Shows with skipped episodes ({{ report.numbering_mismatches|length }})</label>
-  <span class="hint">TV Time uses TheTVDB episode numbering; these shows are numbered
-    differently on TMDB (usually anime or long-runners), so mismatched episodes were
-    skipped to avoid import errors. The show itself is still added. For anime, a
-    MyAnimeList-based import will map episodes correctly.</span>
-  <table>
-    <tr><th>Show</th><th>Episodes skipped</th></tr>
-    {% for m in report.numbering_mismatches %}
-    <tr><td>{{ m.title }}</td><td>{{ m.skipped }}</td></tr>
+{% if download %}
+  <a class="btn" href="{{ url_for('download', job_id=job_id) }}" style="margin-bottom:26px">↓ Download CSV</a>
+{% endif %}
+
+{% if report.details %}
+<details class="review-data">
+  <summary>Review imported data <span class="count">{{ report.details|length }} titles</span></summary>
+  <div class="dtl-tools">
+    <input type="search" id="dtl-filter" placeholder="Filter by title…">
+  </div>
+  <div class="tbl detail-tbl" id="dtl-tbl">
+    <div class="tr th dtl">
+      <span>Type</span><span>Title</span><span>Seasons</span><span>Episodes</span>
+      <span>Rewatches</span><span>Status</span><span>Score</span><span>Last watched</span>
+    </div>
+    {% for d in report.details %}
+    <div class="tr dtl" data-title="{{ d.title|lower }}">
+      <span><span class="kind kind-{{ d.type }}">{{ d.type }}</span></span>
+      <span title="{{ d.title }}">{{ d.title }}</span>
+      <span class="mono mut">{{ d.seasons }}</span>
+      <span class="mono">{{ d.episodes }}</span>
+      <span class="mono mut">{{ d.rewatches }}</span>
+      <span class="mut">{{ d.status }}</span>
+      <span class="mono">{{ d.score }}</span>
+      <span class="mono mut" style="font-size:12.5px">{{ d.last }}</span>
+    </div>
     {% endfor %}
-  </table>
-</div>
+  </div>
+</details>
 {% endif %}
 
 {% set unmatched = report.unmatched_shows + report.unmatched_movies %}
 {% if unmatched %}
 <form class="card" method="post" action="{{ url_for('save_overrides') }}">
-  <label>Fix unmatched titles ({{ unmatched|length }})</label>
-  <span class="hint">Click a title to find it, copy the numeric id from the URL
+  <div class="fix-head">
+    <span style="font-weight:700;font-size:15px">Fix unmatched titles</span>
+    <span class="attn">{{ unmatched|length }} need attention</span>
+  </div>
+  <p class="hint" style="margin:0 0 16px;max-width:640px">Click a title to look it up, copy the numeric id from the URL
     (TMDB <code>/tv/<b>1234</b></code> or <code>/movie/<b>1234</b></code>; MyAnimeList
-    <code>/anime/<b>1234</b></code>), paste it, and Save. Then re-run — matched
-    items are cached, so it's quick.</span>
-  <table>
-    <tr><th>Type</th><th>Title</th><th>State</th><th>Last date</th><th>ID</th></tr>
+    <code>/anime/<b>1234</b></code>), paste it, and save. Matched items are cached, so re-running is quick.</p>
+  <div class="tbl">
+    <div class="tr th"><span>Type</span><span>Title</span><span>State</span><span>Last date</span><span>ID</span></div>
     {% for u in unmatched %}
-    <tr>
-      <td>{{ u.kind }}</td>
-      <td><a href="{{ u.search_url }}" target="_blank" rel="noopener">{{ u.title }} ↗</a></td>
-      <td>{{ u.state }}</td>
-      <td>{{ u.date }}</td>
-      <td>
+    <div class="tr">
+      <span><span class="kind kind-{{ u.kind }}">{{ u.kind }}</span></span>
+      <span><a href="{{ u.search_url }}" target="_blank" rel="noopener">{{ u.title }} ↗</a></span>
+      <span class="mut">{{ u.state }}</span>
+      <span class="mono mut" style="font-size:12.5px">{{ u.date }}</span>
+      <span>
         <input type="hidden" name="ovr_key" value="{{ u.override_key }}">
         <input type="hidden" name="ovr_title" value="{{ u.title }}">
-        <input type="text" name="ovr_id" inputmode="numeric" placeholder="id"
-               style="width:110px;padding:6px 8px">
-      </td>
-    </tr>
+        <input type="text" name="ovr_id" inputmode="numeric" placeholder="id">
+      </span>
+    </div>
     {% endfor %}
-  </table>
-  <button type="submit" style="margin-top:12px">Save overrides</button>
+  </div>
+  <button type="submit" style="margin-top:14px">Save overrides &amp; re-run</button>
 </form>
+{% endif %}
+
+{% if report.numbering_mismatches %}
+<div class="note-warn">
+  <span class="ic">⚠</span>
+  <div>
+    <b>{{ report.numbering_mismatches|length }} shows had episodes skipped.</b>
+    TV Time uses TheTVDB episode numbering; these shows are numbered differently on TMDB
+    (usually anime or long-runners), so mismatched episodes were skipped to avoid import errors.
+    The show itself is still added. For anime, a MyAnimeList-based import maps episodes correctly.
+    <div class="tbl" style="margin-top:12px">
+      <div class="tr th two"><span>Show</span><span>Episodes skipped</span></div>
+      {% for m in report.numbering_mismatches %}
+      <div class="tr two"><span>{{ m.title }}</span><span class="mono">{{ m.skipped }}</span></div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
 {% endif %}
 
 {% if push and push.failures %}
 <div class="card">
-  <label>First errors</label>
-  <table>{% for f in push.failures %}<tr><td>{{ f }}</td></tr>{% endfor %}</table>
+  <label style="margin-top:0">First errors</label>
+  <div class="tbl">{% for f in push.failures %}<div class="tr one mono" style="font-size:12.5px;color:var(--err)">{{ f }}</div>{% endfor %}</div>
 </div>
 {% endif %}
 
-<a class="btn" href="{{ url_for('index') }}">Run another</a>
+<a class="btn secondary" href="{{ url_for('index') }}">Run another</a>
+
+<style>
+  .result-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:22px}
+  .ok-badge{width:30px;height:30px;border-radius:50%;flex:none;margin-top:2px;
+    background:rgba(55,193,114,.15);border:1px solid rgba(55,193,114,.4);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-weight:700}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .num{font-size:24px;font-weight:600}
+  .stat .num .of{color:var(--dim);font-size:15px}
+  .stat .lbl{color:var(--mut);font-size:12.5px;margin-top:3px}
+
+  .fix-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .attn{background:rgba(240,198,116,.14);border:1px solid rgba(240,198,116,.4);color:var(--warn);
+    font-size:12px;font-weight:600;border-radius:20px;padding:2px 10px}
+
+  .tbl{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .tr{display:grid;grid-template-columns:70px 1fr 90px 110px 130px;gap:12px;
+    padding:11px 14px;align-items:center;font-size:13.5px;border-top:1px solid var(--card2)}
+  .tr:first-child{border-top:0}
+  .tr.th{background:var(--card2);font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--mut)}
+  .tr.two{grid-template-columns:1fr 130px}
+  .tr.one{grid-template-columns:1fr}
+  .tr .mut{color:var(--mut)}
+  .tr input[type=text]{width:100%;padding:6px 9px;font-size:13px;background:var(--panel)}
+  .kind{font-family:var(--mono);font-size:11px;border-radius:5px;padding:2px 7px}
+  .kind-tv{color:#8fb4ff;background:rgba(143,180,255,.1)}
+  .kind-movie{color:#ffc48f;background:rgba(255,196,143,.1)}
+  .kind-anime{color:#c9b6ff;background:rgba(201,182,255,.1)}
+
+  .note-warn{display:flex;gap:12px;background:rgba(240,198,116,.06);
+    border:1px solid rgba(240,198,116,.22);border-radius:12px;padding:14px 16px;
+    margin-bottom:16px;font-size:13px;color:#c7d0dd}
+  .note-warn .ic{color:var(--warn);font-size:16px}
+  .note-warn b{color:var(--txt)}
+
+  /* collapsible review-data table */
+  .review-data{border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin-bottom:22px;overflow:hidden}
+  .review-data>summary{cursor:pointer;padding:14px 16px;font-weight:600;font-size:14px;
+    list-style:none;display:flex;align-items:center;gap:10px}
+  .review-data>summary::-webkit-details-marker{display:none}
+  .review-data>summary::before{content:"▸";color:var(--mut);transition:transform .15s}
+  .review-data[open]>summary::before{transform:rotate(90deg)}
+  .review-data .count{color:var(--mut);font-size:12.5px;font-weight:400}
+  .dtl-tools{padding:0 16px 12px}
+  .dtl-tools input{width:100%;max-width:280px;padding:8px 11px;font-size:13px;
+    background:var(--panel,var(--card2));border:1px solid var(--line);border-radius:8px;color:var(--txt)}
+  .review-data .tbl{border:0;border-top:1px solid var(--line);border-radius:0;
+    max-height:440px;overflow:auto}
+  .tr.dtl{grid-template-columns:64px 1.4fr 68px 84px 90px 104px 56px 100px}
+  .tr.dtl span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:760px){
+    .tr.dtl{grid-template-columns:58px 1fr 70px 78px}
+    .tr.dtl span:nth-child(n+5){display:none}
+  }
+</style>
+
+<script>
+(function () {
+  const f = document.getElementById('dtl-filter');
+  if (!f) return;
+  const rows = Array.from(document.querySelectorAll('#dtl-tbl .tr.dtl'));
+  f.addEventListener('input', function () {
+    const q = f.value.trim().toLowerCase();
+    rows.forEach(function (r) {
+      r.style.display = (!q || r.dataset.title.indexOf(q) !== -1) ? '' : 'none';
+    });
+  });
+})();
+</script>
 {% endblock %}
