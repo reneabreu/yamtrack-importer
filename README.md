@@ -1,18 +1,25 @@
 # Yamtrack Importer
 
-Migrate your media history from other services into
-[Yamtrack](https://github.com/FuzzyGrim/Yamtrack). Runs as a **Docker web app**
-(pick a source, upload an export, download a CSV or push to the API) or as a
+[![CI](https://github.com/reneabreu/yamtrack-importer/actions/workflows/ci.yml/badge.svg)](https://github.com/reneabreu/yamtrack-importer/actions/workflows/ci.yml)
+[![Publish image](https://github.com/reneabreu/yamtrack-importer/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/reneabreu/yamtrack-importer/actions/workflows/docker-publish.yml)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-yamtrack--importer-blue?logo=docker)](https://github.com/reneabreu/yamtrack-importer/pkgs/container/yamtrack-importer)
+
+Import your TV, movie, and anime watch history into
+[Yamtrack](https://github.com/FuzzyGrim/Yamtrack) — from a growing list of
+services. Runs as a self-hosted **Docker web app** (pick a source, upload an
+export or connect an account, then download a CSV or push to the API) or as a
 **command-line tool**.
 
-**TV Time** is fully supported today — watched TV episodes (with dates and
-rewatches), watched movies, watchlist items, and show ratings. TV Time shuts
-down on **15 July 2026**, so export your data first at
-<https://gdpr.tvtime.com/gdpr/self-service>.
+It's built around a **source-plugin architecture**, so each service is a small
+plugin. Available today:
 
-More sources are on the roadmap (the app is built around a source-plugin
-architecture): Crunchyroll, Netflix, Globo Play, HBO Max, Apple TV, Xbox,
-Nintendo, RetroAchievements, Google Play Games, Komga, and Kavita.
+- **TV Time** — watched episodes (with dates & rewatches), movies, watchlist,
+  and ratings. Shows/movies match via TMDB; anime is auto-routed to MyAnimeList.
+- **Crunchyroll** — watch history matched to MyAnimeList (Jikan).
+
+On the roadmap: Netflix, HBO Max, Apple TV, Globo Play, Xbox, Nintendo,
+RetroAchievements, Google Play Games, Komga, and Kavita. See
+[ROADMAP.md](ROADMAP.md).
 
 ## Run with Docker (web UI)
 
@@ -24,7 +31,7 @@ docker compose up -d
 # open http://localhost:8080
 ```
 
-Update to the latest published build with `docker compose pull && docker compose up -d`.
+Update to the newest published build with `docker compose pull && docker compose up -d`.
 Pin a release by setting `IMAGE_TAG` (e.g. `IMAGE_TAG=v1.0.0`) in `.env`. To build
 from source instead, add the build override:
 
@@ -32,14 +39,19 @@ from source instead, add the build override:
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-The image is published automatically by GitHub Actions on every push to `main`
-(tagged `latest`) and on version tags `vX.Y.Z` (tagged `X.Y.Z` / `X.Y`).
+Images are published by GitHub Actions **only for version tags** `vX.Y.Z`
+(tagged `X.Y.Z`, `X.Y`, and `latest`) or a manual run — not on every push. See
+[Releasing](#releasing).
 
 1. Go to **Settings** and paste your **TMDB API key** (free at
    [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)). For
    direct API import, also add your **Yamtrack URL + API key**.
-2. On the main page pick **TV Time**, upload your GDPR `.zip`, choose to
-   **download a CSV** (recommended) or **push to the API**, and run.
+2. On the main page pick a source (e.g. **TV Time**, upload your GDPR `.zip`),
+   choose to **download a CSV** (recommended) or **push to the API**, and run.
+
+> **TV Time is shutting down on 15 July 2026.** If you use it, request your data
+> export first at <https://gdpr.tvtime.com/gdpr/self-service> — the importer
+> reads that `.zip` directly.
 
 The run streams **live progress** — a progress bar plus a console log — while it
 resolves titles and imports, so a large library that takes a few minutes shows
@@ -254,6 +266,27 @@ The other services in the roadmap are already registered as `planned` so they
 appear in the UI. TMDB-based ones (Netflix, HBO Max, Apple TV, Globo Play) only
 need a parser plus title+year matching; game sources need an IGDB resolver;
 Komga/Kavita need a manga/book resolver.
+
+## Contributing & releasing
+
+Changes go through **pull requests**. On every PR (and push to `main`) the
+[CI workflow](.github/workflows/ci.yml) byte-compiles the code and runs an
+import/route smoke test — doc-only changes are skipped. CI never builds or
+publishes the Docker image.
+
+The image is published (by [docker-publish.yml](.github/workflows/docker-publish.yml))
+only when you **cut a release** or trigger it **manually** — so ordinary commits
+never rebuild it or move `:latest`. Versioning is semver via git tags:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+That publishes `ghcr.io/reneabreu/yamtrack-importer` tagged `1.0.0`, `1.0`,
+`latest`, and `sha-<commit>`. To force a rebuild without a new version, run the
+**Publish Docker image** workflow from the Actions tab (Run workflow); its
+optional `tag` input defaults to `latest`.
 
 ## Notes
 

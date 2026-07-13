@@ -1,13 +1,23 @@
 name: Publish Docker image
 
+# Only builds/pushes the image on a version tag (a release) or a manual run —
+# never on ordinary pushes, so doc/code commits don't rebuild or move :latest.
 on:
   push:
-    branches: [main]
     tags: ["v*.*.*"]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Extra tag to publish (e.g. latest or v1.2.3)"
+        required: false
+        default: "latest"
 
 env:
   IMAGE: ghcr.io/${{ github.repository }}
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
@@ -38,10 +48,10 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=${{ inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.tag != '' }}
             type=sha,format=short
 
       - name: Build and push

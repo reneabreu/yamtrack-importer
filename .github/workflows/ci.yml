@@ -1,0 +1,50 @@
+name: CI
+
+# Validates code on PRs and pushes to main. Skipped for doc-only changes so a
+# README edit doesn't spin up a job. Never builds or publishes the image.
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore: ["**/*.md", "LICENSE"]
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "LICENSE"]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Byte-compile all modules
+        run: python -m compileall -q migrate.py yamtrack_importer webapp
+
+      - name: Import + source registry smoke test
+        env:
+          DATA_DIR: /tmp/ci-data
+        run: |
+          python - <<'PY'
+          import webapp.app as app
+          from yamtrack_importer.sources.registry import all_sources
+          ids = [s.info.id for s in all_sources()]
+          assert "tvtime" in ids and "crunchyroll" in ids, ids
+          client = app.app.test_client()
+          for path in ("/", "/history", "/settings"):
+              assert client.get(path).status_code == 200, path
+          print("OK — sources:", ids)
+          PY
