@@ -58,6 +58,27 @@ Still possible later:
 - MAL as a first-class OAuth source/exporter (read/write a user's anime list
   directly), building on the official-API client.
 
+## Standalone tracker (long-term)
+
+The library is already a canonical, deduplicated store of watch history — the
+hard part of a tracker. The natural next step is to make it usable *on its own*,
+so exporting to Yamtrack (or anything else) becomes optional rather than the
+point:
+
+- **Read/write library UI** — edit, add, and remove entries directly (statuses,
+  scores, progress, mark episodes watched), not just import + export.
+- **Views** — currently-watching, up-next, planning, per-type dashboards, and
+  history/stats over the library.
+- **Yamtrack becomes one exporter among many** — keep the import/export seams so
+  you can still sync out, but nothing depends on Yamtrack being present.
+- **Prerequisites** deferred until it's a hosted tracker rather than a local
+  tool: app **login** (Basic Auth via env) and optional **at-rest encryption**
+  of `library.db` (SQLCipher). Skipped for now — behind Tailscale + filesystem
+  permissions the local file is sufficient.
+
+This is exploratory: the modular core is deliberately destination-agnostic so
+this can grow incrementally without a rewrite.
+
 ## Sources
 
 | Source | Status | Yamtrack type | Matching |
