@@ -11,10 +11,8 @@ services:
     volumes:
       - ./data:/data
     environment:
-      # Optional defaults; you can also set these on the Settings page.
+      # Optional default; you can also set this on the Settings page.
       - TMDB_API_KEY=${TMDB_API_KEY:-}
-      - YAMTRACK_URL=${YAMTRACK_URL:-}
-      - YAMTRACK_API_KEY=${YAMTRACK_API_KEY:-}
       # Change in production.
       - SECRET_KEY=${SECRET_KEY:-change-me}
       - MAX_UPLOAD_MB=200

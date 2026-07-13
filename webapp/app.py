@@ -25,7 +25,6 @@ from flask import (
     url_for,
 )
 
-from yamtrack_importer.api_client import YamtrackClient
 from yamtrack_importer.core.pipeline import run as run_pipeline
 from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, all_exporters, get_exporter
 from yamtrack_importer.mal import MALResolver
@@ -65,7 +64,6 @@ def index():
         exporters=[e.info for e in all_exporters()],
         default_exporter=DEFAULT_EXPORTER,
         has_tmdb=bool(settings.get("tmdb_key")),
-        has_yamtrack=bool(settings.get("yamtrack_url") and settings.get("yamtrack_key")),
         cr_cookie_remembered=bool(_SESSION_SECRETS.get("crunchyroll_etp_rt")),
     )
 
@@ -73,13 +71,7 @@ def index():
 @app.route("/settings", methods=["GET", "POST"])
 def settings_view():
     if request.method == "POST":
-        config.save_settings(
-            {
-                "tmdb_key": request.form.get("tmdb_key", ""),
-                "yamtrack_url": request.form.get("yamtrack_url", ""),
-                "yamtrack_key": request.form.get("yamtrack_key", ""),
-            }
-        )
+        config.save_settings({"tmdb_key": request.form.get("tmdb_key", "")})
         flash("Settings saved.", "ok")
         return redirect(url_for("settings_view"))
 
@@ -87,8 +79,6 @@ def settings_view():
     return render_template(
         "settings.html",
         tmdb_key=settings.get("tmdb_key", ""),
-        yamtrack_url=settings.get("yamtrack_url", ""),
-        yamtrack_key=settings.get("yamtrack_key", ""),
         masked=config.masked,
     )
 
@@ -134,16 +124,6 @@ def save_overrides():
     else:
         flash("No valid ids entered.", "err")
     return redirect(url_for("index"))
-
-
-@app.route("/test-connection", methods=["POST"])
-def test_connection():
-    settings = config.load_settings()
-    if not (settings.get("yamtrack_url") and settings.get("yamtrack_key")):
-        return jsonify(ok=False, detail="Set the Yamtrack URL and API key first, then save.")
-    client = YamtrackClient(settings["yamtrack_url"], settings["yamtrack_key"])
-    ok, detail = client.check_connection()
-    return jsonify(ok=ok, detail=detail)
 
 
 def _collect_inputs(source, work_dir: str) -> dict[str, str]:
@@ -224,11 +204,6 @@ def start():
                 return jsonify(
                     error="Paste your Crunchyroll etp_rt cookie, or tick ‘Reuse last fetch’."
                 ), 400
-
-    if mode == "push" and not dry_run and not (
-        settings.get("yamtrack_url") and settings.get("yamtrack_key")
-    ):
-        return jsonify(error="Set your Yamtrack URL and API key on the Settings page first."), 400
 
     job = jobs.create_job()
 

@@ -8,8 +8,13 @@
 Import your TV, movie, and anime watch history into
 [Yamtrack](https://github.com/FuzzyGrim/Yamtrack) — from a growing list of
 services. Runs as a self-hosted **Docker web app** (pick a source, upload an
-export or connect an account, then download a CSV or push to the API) or as a
-**command-line tool**.
+export or connect an account, then download a Yamtrack import CSV or a portable
+JSON export) or as a **command-line tool**.
+
+> Yamtrack has no media-create REST API — its bulk-import path is the CSV upload
+> (*Settings → Import*), which is also the only one that preserves progress,
+> status, score, rewatches, and real dates. So this tool produces files; it never
+> pushes to a live instance.
 
 It's built around a **source-plugin architecture**, so each service is a small
 plugin. Available today:
@@ -48,9 +53,9 @@ no rebuild (local use only):
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-To test local code **on your Tailscale network** (e.g. to reach a tailnet-only
-Yamtrack, or open it from another device), layer the dev override over the
-Tailscale file instead — reachable at `http://yamtrack-importer:8080` on the tailnet:
+To reach the web UI **from another device on your Tailscale network**, layer the
+dev override over the Tailscale file — reachable at
+`http://yamtrack-importer:8080` on the tailnet:
 
 ```bash
 docker compose -f docker-compose.tailscale.yml -f docker-compose.dev.yml up
@@ -75,10 +80,9 @@ A `Makefile` wraps the compose combinations (run `make` to list them):
 | `make release VERSION=v1.0.0` | Tag & push a release |
 
 1. Go to **Settings** and paste your **TMDB API key** (free at
-   [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)). For
-   direct API import, also add your **Yamtrack URL + API key**.
+   [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)).
 2. On the main page pick a source (e.g. **TV Time**, upload your GDPR `.zip`),
-   choose to **download a CSV** (recommended) or **push to the API**, and run.
+   choose a destination (**Yamtrack CSV** or **Canonical JSON**), and run.
 
 > **TV Time is shutting down on 15 July 2026.** If you use it, request your data
 > export first at <https://gdpr.tvtime.com/gdpr/self-service> — the importer
@@ -95,8 +99,8 @@ fixed right on the result page — paste the correct TMDB/MAL id and Save (write
 field blank on a re-run to reuse the last fetch instead of re-downloading.
 
 Keys, the TMDB match cache, and `overrides.json` live in the `./data` volume, so
-they persist across restarts. You can also seed keys via the `TMDB_API_KEY` /
-`YAMTRACK_URL` / `YAMTRACK_API_KEY` env vars in `docker-compose.yml`.
+they persist across restarts. You can also seed the key via the `TMDB_API_KEY`
+env var in `docker-compose.yml`.
 
 ## Run without Docker (web UI)
 
@@ -118,14 +122,8 @@ Yamtrack tracks TV and movies by **TMDB** id. This tool bridges the gap:
 1. **Parse** the GDPR CSVs into normalized show/movie records.
 2. **Resolve** every title to a TMDB id — shows via TMDB's `/find` (exact,
    using the TheTVDB id), movies via a title + year search. Results are cached.
-3. **Output** either a Yamtrack import CSV or a direct REST API import.
-
-Two output modes:
-
-- **`convert`** — writes a Yamtrack-native CSV you upload in the UI
-  (*Settings → Import → Yamtrack CSV*). This is the most robust path and is
-  recommended for the first run.
-- **`push`** — sends each item to the Yamtrack REST API with your API key.
+3. **Output** a Yamtrack-native import CSV you upload in the UI
+   (*Settings → Import → Yamtrack CSV*), or a portable canonical JSON export.
 
 ## Setup
 
@@ -136,8 +134,7 @@ cp .env.example .env      # then fill in your keys
 
 You need a **TMDB API key** (free): create one at
 <https://www.themoviedb.org/settings/api>. Either a v3 key or a v4 read token
-works. For `push` you also need your Yamtrack URL and the API key from
-*Yamtrack → Settings → Integrations*.
+works.
 
 ## Usage
 
@@ -154,20 +151,6 @@ python migrate.py convert \
 
 Then in Yamtrack: **Settings → Import → Yamtrack CSV** and upload the file.
 
-### Push via the API
-
-```bash
-python migrate.py push \
-  --export "./tv time gdpr data" \
-  --yamtrack-url https://yamtrack.example.com
-
-# preview first without writing anything:
-python migrate.py push --export "./tv time gdpr data" --dry-run
-```
-
-The push command checks whether each show/movie already exists and skips it, so
-it is safe to re-run.
-
 ### Useful flags
 
 | Flag | Effect |
@@ -175,8 +158,7 @@ it is safe to re-run.
 | `--no-movies` / `--no-shows` | Migrate only one media type |
 | `--no-watchlist` | Skip "planning" items (followed-but-unwatched, to-watch) |
 | `--no-ratings` | Don't import star ratings |
-| `--dry-run` | (push) resolve and print, but don't POST |
-| `--no-skip-existing` | (push) re-import items already in Yamtrack |
+| `--no-anime` | Import anime as TV instead of routing to MyAnimeList |
 | `-v` | Verbose logging |
 
 ## Mapping details
@@ -184,7 +166,7 @@ it is safe to re-run.
 | TV Time | Yamtrack |
 |---------|----------|
 | Watched episode | `episode` row with watch date (`progressed_at` / `end_date`) |
-| Rewatches of an episode | `repeats` (API push only) |
+| Rewatches of an episode | `repeats` |
 | Anime (TMDB Animation + Japanese) | Rerouted to Yamtrack `anime` matched on MyAnimeList (not TV) |
 | Show fully watched vs partial | `Completed` vs `In progress` (compared against TMDB episode counts) |
 | Followed / for-later show, no watches | `Planning` |
@@ -221,38 +203,6 @@ take priority.
 - `yamtrack_import.csv` — the import file (convert mode)
 - `tmdb_cache.json` — resolution cache (safe to keep; makes re-runs instant)
 - `migration_report.json` — match stats and unmatched list
-- `push_failures.log` — any API errors (push mode)
-
-## Reaching a Yamtrack that's on Tailscale
-
-If Yamtrack is only reachable over Tailscale (a `100.x.y.z` IP or a `*.ts.net`
-name), the **API push won't work from a normal container** — Docker Desktop /
-OrbStack run containers in a VM that isn't on your tailnet, so there's no route
-to `100.x`. (The **Settings → Test Yamtrack connection** button will tell you if
-this is the problem.) Pick one:
-
-- **Easiest — download the CSV instead.** CSV mode never contacts Yamtrack. Grab
-  the CSV from the web app and upload it via *Yamtrack → Settings → Import*.
-- **Run the push on your Mac**, which is already on Tailscale:
-
-  ```bash
-  pip install -r requirements.txt
-  python migrate.py push --export ./tvtime_extracted \
-    --tmdb-key YOUR_TMDB_KEY \
-    --yamtrack-url http://100.x.y.z:PORT --yamtrack-key YOUR_YT_KEY
-  ```
-
-  (`--export` wants the unzipped folder — unzip your GDPR `.zip` first.)
-- **Keep the containerized web push** by joining the container to your tailnet
-  with the included sidecar compose:
-
-  ```bash
-  echo "TS_AUTHKEY=tskey-auth-xxxx" >> .env   # from the Tailscale admin console
-  docker compose -f docker-compose.tailscale.yml up -d --build
-  ```
-
-  The app becomes a device on your tailnet, so `http://100.x.y.z:PORT` resolves
-  and routes. Open the UI at <http://localhost:8080> as usual.
 
 ## Crunchyroll (beta)
 
@@ -265,7 +215,7 @@ which forces anime through TMDB's TV numbering.
    Application (Chrome) / Storage (Firefox) → Cookies → `https://www.crunchyroll.com`,
    and copy the value of `etp_rt`. It's used only for the run and never stored.
 3. Run — it fetches your history, matches each series to MyAnimeList (via the
-   free Jikan API, no key), and produces anime rows (CSV or API push).
+   free Jikan API, no key), and produces anime rows (CSV or JSON).
 
 Notes and caveats:
 
@@ -321,14 +271,11 @@ optional `tag` input defaults to `latest`.
 
 ## Notes
 
-- The CSV import format is verified against Yamtrack's own importer. The REST
-  API path targets the documented `/api/v1` endpoints; if your Yamtrack version
-  differs, prefer the CSV path.
-- A direct API push of a large library makes thousands of calls and can take a
-  while; the CSV path is faster for big imports. (The container runs gunicorn
-  with no request timeout to accommodate long pushes.)
-- Nothing is sent anywhere except TMDB (for matching) and your own Yamtrack
-  instance. Your export never leaves your machine otherwise.
+- The CSV import format is verified against Yamtrack's own importer. Yamtrack has
+  no media-create REST API, so the CSV upload is the supported bulk-import path
+  (and the only one that preserves progress, score, rewatches, and dates).
+- Nothing is sent anywhere except TMDB and MyAnimeList/Jikan (for matching). Your
+  export never leaves your machine otherwise, and the output file stays local.
 
 ## Contributing
 

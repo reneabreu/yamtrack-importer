@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Modular import/export architecture**: sources (imports) and exporters
+  (destinations) are now independent plugins over a neutral canonical model, so
+  either can be added or removed without touching the core.
+
+### Removed
+
+- **Yamtrack "Push to API" mode** and its `YamtrackClient`, Test-connection
+  route, and Yamtrack URL/key settings. Yamtrack has no media-create REST API —
+  only the CSV upload preserves progress, score, rewatches, and dates — so
+  Yamtrack is now a file/CSV-only destination.
+
 ### Added
 
 - Self-hosted **web app** (Flask) and **CLI** to import media watch history into
@@ -24,9 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Crunchyroll**: `etp_rt` cookie auth + paginated watch history → anime rows
   matched to MyAnimeList. The raw fetch is cached and the cookie is remembered
   in process memory for the session.
-- **Output**: Yamtrack-native CSV export (verified against Yamtrack's importer)
-  and direct REST API push, both with live SSE progress and connection
-  diagnostics.
+- **Exporters**: Yamtrack-native CSV export (verified against Yamtrack's
+  importer) and a portable **canonical JSON** export, with live SSE progress.
 - **Result tooling**: in-web override editor for unmatched titles (writes
   `overrides.json`; bare ids self-enrich), and persistent run **History** with
   re-view / re-download.

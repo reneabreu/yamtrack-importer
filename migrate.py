@@ -3,14 +3,10 @@
 
 Usage
 -----
-Convert to a Yamtrack import CSV (recommended, upload via the Yamtrack UI):
+Convert to a Yamtrack import CSV, then upload it via Yamtrack -> Settings ->
+Import (Yamtrack has no media-create API; the CSV is its bulk-import path):
 
     python migrate.py convert --export "./tv time gdpr data" --out yamtrack_import.csv
-
-Push straight to the Yamtrack REST API:
-
-    python migrate.py push --export "./tv time gdpr data" \
-        --yamtrack-url https://yamtrack.example.com
 
 Config can also come from a .env file (see .env.example).
 """
@@ -107,27 +103,6 @@ def cmd_convert(args):
     print("Upload it in Yamtrack: Settings -> Import -> Yamtrack CSV.")
 
 
-def cmd_push(args):
-    exporter = get_exporter("yamtrack")
-    settings = {
-        "yamtrack_url": args.yamtrack_url or os.environ.get("YAMTRACK_URL", ""),
-        "yamtrack_key": args.yamtrack_key or os.environ.get("YAMTRACK_API_KEY", ""),
-    }
-    if not args.dry_run:
-        ok, detail = exporter.check_connection(settings)
-        if not ok:
-            sys.exit(f"Could not connect to Yamtrack: {detail}")
-
-    rows, _ = _run_pipeline(args)
-    stats = exporter.push(rows, settings, dry_run=args.dry_run)
-    print(f"\nDone. created={stats['created']} skipped={stats['skipped']} "
-          f"failed={stats['failed']}")
-    if stats["failures"]:
-        with open("push_failures.log", "w", encoding="utf-8") as fh:
-            fh.write("\n".join(stats["failures"]))
-        print(f"  Wrote {len(failures)} failures -> push_failures.log")
-
-
 def main(argv=None):
     _load_dotenv()
     parser = argparse.ArgumentParser(description="Migrate TV Time data to Yamtrack.")
@@ -138,15 +113,6 @@ def main(argv=None):
     _add_common(p_conv)
     p_conv.add_argument("--out", default="yamtrack_import.csv", help="Output CSV path.")
     p_conv.set_defaults(func=cmd_convert)
-
-    p_push = sub.add_parser("push", help="Push to the Yamtrack REST API.")
-    _add_common(p_push)
-    p_push.add_argument("--yamtrack-url", default=os.environ.get("YAMTRACK_URL", ""))
-    p_push.add_argument("--yamtrack-key", default=os.environ.get("YAMTRACK_API_KEY", ""))
-    p_push.add_argument("--dry-run", action="store_true", help="Resolve + print, don't POST.")
-    p_push.add_argument("--no-skip-existing", action="store_true",
-                        help="Do not skip items already in Yamtrack.")
-    p_push.set_defaults(func=cmd_push)
 
     args = parser.parse_args(argv)
     logging.basicConfig(

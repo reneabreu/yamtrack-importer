@@ -27,9 +27,11 @@ The project is a neutral pipeline, not a Yamtrack-only tool:
 - A **resolution layer** enriches items with the ids the chosen exporter needs.
 - **Export modules** (`exporters/`) write the destination's format.
 
-Yamtrack is the first exporter. Others (Trakt, Simkl, plain JSON, or a
-home-grown tracker) can be added as exporters without touching sources — the
-foundation for making this the base of a larger media-tracking system.
+Yamtrack (CSV) and a portable **canonical JSON** are the first two exporters.
+Others (Trakt, Simkl, or a home-grown tracker) can be added without touching
+sources — the foundation for making this the base of a larger media-tracking
+system. Destinations with a real create-API can implement the exporter's
+`push` path; Yamtrack has no such API, so it stays file-only.
 
 ## Sources
 
@@ -52,5 +54,5 @@ foundation for making this the base of a larger media-tracking system.
 
 - Absolute-episode remap for anime coming through the TV Time (TMDB) path, as a
   fallback when a dedicated anime source isn't used.
-- Background/queued pushes so large API imports don't tie up a request.
+- Real create-API exporters (e.g. Trakt/Simkl) over the exporter `push` seam.
 - A one-click "write overrides.json" editor in the result page.

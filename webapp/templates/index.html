@@ -134,7 +134,6 @@
             "ext": "{{ e.output_ext|upper }}", "file_hint": {{ e.file_hint|tojson }},
             "api_hint": {{ e.api_hint|tojson }}, "label": {{ e.label|tojson }}}{{ "," if not loop.last }}{% endfor %}
         };
-        window.HAS_YAMTRACK = {{ 'true' if has_yamtrack else 'false' }};
       </script>
 
       <div class="mode-grid">
@@ -318,8 +317,7 @@
     const hasApi = info.modes.indexOf('api') !== -1;
     document.getElementById('mode-api').style.display = hasApi ? '' : 'none';
     const apiHint = document.getElementById('mode-api-hint');
-    apiHint.textContent = (info.api_hint || 'Direct import') +
-      (hasApi && !window.HAS_YAMTRACK ? ' — needs URL + key in Settings' : '');
+    apiHint.textContent = info.api_hint || 'Direct import';
     if (!hasApi) {
       form.querySelector('input[name="mode"][value="csv"]').checked = true;
       document.getElementById('dry-row').style.display = 'none';

@@ -1,8 +1,12 @@
-"""Yamtrack export destination: canonical MediaItems -> Yamtrack rows (CSV/API)."""
+"""Yamtrack export destination: canonical MediaItems -> Yamtrack import CSV.
+
+Yamtrack has no media-create REST API; its bulk-import path is the CSV upload
+(Settings → Import), which is also the only one that preserves progress,
+status, score, rewatches, and real dates. So this is a file-only destination.
+"""
 
 from __future__ import annotations
 
-from ..api_client import YamtrackClient
 from ..core.model import MediaItem, MediaType, Status
 from ..core.resolve_service import status_label
 from ._rows import fmt_date as _fmt_date
@@ -16,13 +20,12 @@ class YamtrackExporter(Exporter):
     info = ExporterInfo(
         id="yamtrack",
         label="Yamtrack",
-        modes=["file", "api"],
+        modes=["file"],
         media_types=["tv", "movie", "anime"],
         requires={"tv": "tmdb", "movie": "tmdb", "anime": "mal"},
         output_ext="csv",
         output_mime="text/csv",
-        file_hint="Recommended — upload via Yamtrack → Settings → Import",
-        api_hint="Direct import to your Yamtrack instance",
+        file_hint="Upload via Yamtrack → Settings → Import",
     )
 
     def details(self, records):
@@ -98,38 +101,6 @@ class YamtrackExporter(Exporter):
             ))
         return rows
 
-    # ---- outputs ----
+    # ---- output ----
     def write(self, rows: list[dict], out_path: str) -> int:
         return write_csv(rows, out_path)
-
-    def check_connection(self, settings: dict):
-        client = YamtrackClient(settings.get("yamtrack_url", ""), settings.get("yamtrack_key", ""))
-        return client.check_connection()
-
-    def push(self, rows: list[dict], settings: dict, dry_run=False, progress=None) -> dict:
-        emit = progress or (lambda **_k: None)
-        client = YamtrackClient(
-            settings.get("yamtrack_url", ""), settings.get("yamtrack_key", ""), dry_run=dry_run
-        )
-        total = len(rows)
-        emit(type="progress", phase="push", current=0, total=total)
-        created = skipped = failed = 0
-        failures: list[str] = []
-        for i, row in enumerate(rows, 1):
-            mt, src, mid = row["media_type"], row.get("source", "tmdb"), str(row["media_id"])
-            if not dry_run and mt in ("tv", "movie") and mid and client.exists(mt, src, mid):
-                skipped += 1
-            else:
-                ok, msg = client.create(row)
-                if ok:
-                    created += 1
-                else:
-                    failed += 1
-                    if len(failures) < 100:
-                        failures.append(f"{mt} {mid}: {msg}")
-                        emit(type="log", msg=f"  ✗ {mt} {mid}: {msg}")
-            if i % 25 == 0 or i == total:
-                emit(type="progress", phase="push", current=i, total=total)
-        emit(type="log", msg=f"Done. created={created} skipped={skipped} failed={failed}")
-        return {"created": created, "skipped": skipped, "failed": failed,
-                "dry_run": dry_run, "failures": failures}

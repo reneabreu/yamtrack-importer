@@ -13,8 +13,6 @@ OVERRIDES_PATH = os.path.join(DATA_DIR, "overrides.json")
 # Fields stored in settings.json (env vars provide defaults).
 _KEYS = {
     "tmdb_key": "TMDB_API_KEY",
-    "yamtrack_url": "YAMTRACK_URL",
-    "yamtrack_key": "YAMTRACK_API_KEY",
 }
 
 
@@ -46,9 +44,9 @@ def save_settings(new: dict) -> None:
                 current = json.load(fh)
         except (json.JSONDecodeError, OSError):
             current = {}
-    # Only overwrite a field when a non-empty value is submitted, so saving one
-    # field (e.g. the URL) doesn't wipe the others — password fields render
-    # blank and would otherwise clear the stored keys. Blank = keep existing.
+    # Only overwrite a field when a non-empty value is submitted — password
+    # fields render blank and would otherwise clear the stored key on save.
+    # Blank = keep existing.
     for k in _KEYS:
         value = (new.get(k) or "").strip()
         if value:

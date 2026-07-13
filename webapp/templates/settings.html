@@ -15,24 +15,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <div class="eyebrow" style="margin-bottom:14px">Yamtrack · only for direct API push</div>
-    <label style="margin-top:0">Yamtrack URL</label>
-    <input type="url" name="yamtrack_url" value="{{ yamtrack_url }}"
-           placeholder="https://yamtrack.example.com">
-
-    <label style="margin-top:16px">Yamtrack API key
-      <span class="hint">(Yamtrack → Settings → Integrations)</span></label>
-    <input type="password" name="yamtrack_key"
-           placeholder="{{ masked(yamtrack_key) or 'X-api-key value' }}">
-
-    <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
-      <button type="button" class="secondary" id="test-btn">Test connection</button>
-      <span id="test-result" class="hint"></span>
-    </div>
-    <span class="hint">Tests the saved values — save first if you just changed them.</span>
-  </div>
-
   <div style="display:flex;gap:12px">
     <button type="submit">Save settings</button>
     <a class="btn secondary" href="{{ url_for('index') }}">Back</a>
@@ -46,19 +28,4 @@
     padding:6px 11px;border-radius:8px}
   form{max-width:620px}
 </style>
-
-<script>
-  document.getElementById('test-btn').addEventListener('click', async function () {
-    const out = document.getElementById('test-result');
-    out.textContent = 'Testing…'; out.style.color = 'var(--mut)';
-    try {
-      const r = await fetch('{{ url_for("test_connection") }}', { method: 'POST' });
-      const d = await r.json();
-      out.textContent = d.ok ? '✓ Connected' : '✗ ' + d.detail;
-      out.style.color = d.ok ? 'var(--ok)' : 'var(--err)';
-    } catch (e) {
-      out.textContent = '✗ ' + e; out.style.color = 'var(--err)';
-    }
-  });
-</script>
 {% endblock %}
