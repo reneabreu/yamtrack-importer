@@ -14,6 +14,7 @@ LIBRARY_PATH = os.path.join(DATA_DIR, "library.db")
 # Fields stored in settings.json (env vars provide defaults).
 _KEYS = {
     "tmdb_key": "TMDB_API_KEY",
+    "mal_client_id": "MAL_CLIENT_ID",
 }
 
 

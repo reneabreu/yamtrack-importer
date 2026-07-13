@@ -52,6 +52,9 @@ def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--export", required=True, help="Path to the extracted TV Time GDPR folder.")
     p.add_argument("--tmdb-key", default=os.environ.get("TMDB_API_KEY", ""),
                    help="TMDB v3 API key or v4 read token (env: TMDB_API_KEY).")
+    p.add_argument("--mal-client-id", default=os.environ.get("MAL_CLIENT_ID", ""),
+                   help="Official MAL API Client ID (env: MAL_CLIENT_ID). "
+                        "Blank uses the free Jikan API.")
     p.add_argument("--cache", default="tmdb_cache.json", help="Resolution cache file.")
     p.add_argument("--overrides", default="overrides.json",
                    help="Manual id overrides file (optional).")
@@ -71,7 +74,8 @@ def _providers(args):
                              overrides_path=args.overrides),
         "mal": MALResolver(
             cache_path=os.path.join(os.path.dirname(args.cache) or ".", "mal_cache.json"),
-            overrides_path=args.overrides),
+            overrides_path=args.overrides,
+            client_id=getattr(args, "mal_client_id", "")),
     }
 
 
@@ -132,11 +136,17 @@ def cmd_ingest(args):
 
 def cmd_export_library(args):
     with Library(args.library) as lib:
-        rows, _ = export_library(lib, get_exporter(args.exporter))
+        rows, report = export_library(lib, get_exporter(args.exporter), delta=args.delta)
         if not rows:
+            if args.delta:
+                print("No changes since the last export — nothing written.")
+                return
             sys.exit("Library is empty — run `ingest` first.")
         n = get_exporter(args.exporter).write(rows, args.out)
-    print(f"Wrote {n} rows -> {args.out}")
+    if args.delta:
+        print(f"Wrote {n} rows for {report['changed_titles']} changed title(s) -> {args.out}")
+    else:
+        print(f"Wrote {n} rows -> {args.out}")
 
 
 def cmd_clear_library(args):
@@ -167,6 +177,8 @@ def main(argv=None):
     p_exp.add_argument("--exporter", default="yamtrack", choices=exporter_ids,
                        help="Destination format.")
     p_exp.add_argument("--out", default="yamtrack_import.csv", help="Output file path.")
+    p_exp.add_argument("--delta", action="store_true",
+                       help="Only titles added/changed since this exporter's last export.")
     p_exp.set_defaults(func=cmd_export_library)
 
     p_clr = sub.add_parser("clear-library", help="Empty the local library.")

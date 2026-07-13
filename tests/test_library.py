@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from yamtrack_importer.core.library import Library, item_from_json, item_to_json
 from yamtrack_importer.core.merge import identity, merge_items
 from yamtrack_importer.core.model import EpisodeWatch, MediaItem, MediaType, Status
+from yamtrack_importer.core.pipeline import export_library
+from yamtrack_importer.exporters.registry import get_exporter
 
 
 def _anime(title, mal, **kw):
@@ -85,6 +87,39 @@ def test_roundtrip_serialization():
     assert back.season_totals == {1: 10}
     assert back.episodes[0].watched_at == datetime(2020, 5, 4)
     assert back.episodes[0].repeats == 2
+
+
+def test_delta_export_tracks_changes():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    yex = get_exporter("yamtrack")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.TV, "Show", ids={"tmdb": "1"}, total=10,
+                              episodes=[EpisodeWatch(1, 1, datetime(2020, 1, 1))])])
+        # full export sets the baseline
+        rows, rep = export_library(lib, yex)
+        assert rep["delta"] is False and rep["rows"] > 0
+        # nothing changed since -> empty delta
+        rows, rep = export_library(lib, yex, delta=True)
+        assert rep["changed_titles"] == 0 and rows == []
+        # a new episode -> that title shows up in the next delta
+        lib.ingest([MediaItem(MediaType.TV, "Show", ids={"tmdb": "1"}, total=10,
+                             episodes=[EpisodeWatch(1, 2, datetime(2020, 2, 1))])])
+        rows, rep = export_library(lib, yex, delta=True)
+        assert rep["changed_titles"] == 1 and rows
+        # exporting advances the baseline -> next delta is empty again
+        rows, rep = export_library(lib, yex, delta=True)
+        assert rep["changed_titles"] == 0
+
+
+def test_delta_is_per_exporter():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.MOVIE, "Film", ids={"tmdb": "2"},
+                             status=Status.COMPLETED)])
+        export_library(lib, get_exporter("yamtrack"))          # yamtrack baseline set
+        # json exporter has its own baseline -> the item is still "new" to it
+        _, rep = export_library(lib, get_exporter("json"), delta=True)
+        assert rep["changed_titles"] == 1
 
 
 if __name__ == "__main__":

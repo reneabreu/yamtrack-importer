@@ -17,7 +17,13 @@
 <div class="lib-actions">
   <div class="exports">
     {% for e in exporters %}
-    <a class="btn" href="{{ url_for('library_export', exporter_id=e.id) }}">↓ Export {{ e.output_ext|upper }}</a>
+    <div class="exp-group">
+      <a class="btn" href="{{ url_for('library_export', exporter_id=e.id) }}">↓ Export {{ e.output_ext|upper }}</a>
+      <a class="btn secondary" href="{{ url_for('library_export', exporter_id=e.id, delta=1) }}"
+         title="Only titles added or changed (new episodes, rewatches) since your last {{ e.output_ext|upper }} export">
+        Changes only{% if changed[e.id] %} <span class="chg">{{ changed[e.id] }}</span>{% endif %}
+      </a>
+    </div>
     {% endfor %}
   </div>
   <form method="post" action="{{ url_for('library_clear') }}"
@@ -63,9 +69,13 @@
   .stat .num{font-size:24px;font-weight:600}
   .stat .lbl{color:var(--mut);font-size:12.5px;margin-top:3px;text-transform:capitalize}
 
-  .lib-actions{display:flex;align-items:center;justify-content:space-between;
+  .lib-actions{display:flex;align-items:flex-start;justify-content:space-between;
     gap:12px;flex-wrap:wrap;margin-bottom:20px}
-  .lib-actions .exports{display:flex;gap:10px;flex-wrap:wrap}
+  .lib-actions .exports{display:flex;gap:16px;flex-wrap:wrap}
+  .exp-group{display:flex;gap:8px;align-items:center}
+  .chg{font-family:var(--mono);font-size:11px;background:rgba(79,140,255,.15);
+    border:1px solid rgba(79,140,255,.4);color:var(--accent-b);
+    border-radius:20px;padding:0 7px;margin-left:2px}
 
   .review-data{border:1px solid var(--line);border-radius:12px;background:var(--card);
     margin-bottom:22px;overflow:hidden}

@@ -44,7 +44,10 @@ def _build_providers(settings: dict) -> dict:
             api_key=tmdb_key, cache_path=config.CACHE_PATH, overrides_path=config.OVERRIDES_PATH
         )
     mal_cache = os.path.join(os.path.dirname(config.CACHE_PATH) or ".", "mal_cache.json")
-    providers["mal"] = MALResolver(cache_path=mal_cache, overrides_path=config.OVERRIDES_PATH)
+    providers["mal"] = MALResolver(
+        cache_path=mal_cache, overrides_path=config.OVERRIDES_PATH,
+        client_id=settings.get("mal_client_id", ""),
+    )
     return providers
 
 app = Flask(__name__)
@@ -72,7 +75,10 @@ def index():
 @app.route("/settings", methods=["GET", "POST"])
 def settings_view():
     if request.method == "POST":
-        config.save_settings({"tmdb_key": request.form.get("tmdb_key", "")})
+        config.save_settings({
+            "tmdb_key": request.form.get("tmdb_key", ""),
+            "mal_client_id": request.form.get("mal_client_id", ""),
+        })
         flash("Settings saved.", "ok")
         return redirect(url_for("settings_view"))
 
@@ -80,6 +86,7 @@ def settings_view():
     return render_template(
         "settings.html",
         tmdb_key=settings.get("tmdb_key", ""),
+        mal_client_id=settings.get("mal_client_id", ""),
         masked=config.masked,
     )
 
@@ -349,11 +356,15 @@ def history():
 @app.route("/library")
 def library_view():
     """Show the merged local library — every source deduped into one collection."""
+    exporters = list(all_exporters())
     library = Library(config.LIBRARY_PATH)
     try:
         items = library.all_items()
         counts = library.counts_by_type()
         total = library.count()
+        # how many titles changed since each exporter's last export
+        changed = {e.info.id: len(library.changed_since_snapshot(e.info.id)[0])
+                   for e in exporters}
     finally:
         library.close()
     # Reuse the canonical exporter's per-title summary for the review table.
@@ -366,7 +377,7 @@ def library_view():
     return render_template(
         "library.html",
         details=details, counts=counts, total=total,
-        exporters=[e.info for e in all_exporters()],
+        exporters=[e.info for e in exporters], changed=changed,
     )
 
 
@@ -377,20 +388,25 @@ def library_export(exporter_id):
     except KeyError:
         flash("Unknown destination.", "err")
         return redirect(url_for("library_view"))
+    delta = request.args.get("delta") == "1"
     library = Library(config.LIBRARY_PATH)
     try:
-        rows, _ = export_library(library, exporter)
+        rows, _ = export_library(library, exporter, delta=delta)
     finally:
         library.close()
     if not rows:
-        flash("Library is empty — run an import first.", "err")
+        if delta:
+            flash("No changes since the last export.", "ok")
+        else:
+            flash("Library is empty — run an import first.", "err")
         return redirect(url_for("library_view"))
     ext = exporter.info.output_ext
+    suffix = "_changes" if delta else ""
     out_dir = tempfile.mkdtemp(prefix="yamlib_")
-    out_path = os.path.join(out_dir, f"library_{exporter.info.id}.{ext}")
+    out_path = os.path.join(out_dir, f"library_{exporter.info.id}{suffix}.{ext}")
     exporter.write(rows, out_path)
     return send_file(out_path, as_attachment=True,
-                     download_name=f"library_{exporter.info.id}.{ext}",
+                     download_name=f"library_{exporter.info.id}{suffix}.{ext}",
                      mimetype=exporter.info.output_mime)
 
 

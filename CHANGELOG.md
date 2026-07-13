@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Delta ("changes only") exports**: each destination snapshots the library on
+  export, so a follow-up export can include only titles added or changed since —
+  new episodes, rewatches, status/score. Web adds a "Changes only" button (with a
+  pending-changes count); CLI adds `export-library --delta`. Baselines are
+  per-exporter and advance on every export.
+- **Official MyAnimeList API** for anime matching, with automatic **Jikan
+  fallback**. Set a MAL Client ID (`MAL_CLIENT_ID` / Settings) to use
+  `api.myanimelist.net` (better results, higher rate limits); left unset, the
+  keyless Jikan API is used as before.
 - **Local library with cross-source dedup**: every import is ingested into a
   persistent SQLite library (`library.db` in the data volume) keyed by canonical
   id (TMDB for screen media, MAL for anime). A title seen on more than one source

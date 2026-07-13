@@ -105,12 +105,27 @@ def run_with_library(library, source, inputs, options, exporter, providers, prog
     return rows, report
 
 
-def export_library(library, exporter):
-    """Build export records from the current library contents (no ingest)."""
-    items = library.all_items()
+def export_library(library, exporter, delta: bool = False):
+    """Build export records from the library (no ingest).
+
+    With ``delta=True`` only titles added or changed since this exporter's last
+    export are included, and the export baseline is advanced so the next delta
+    starts fresh. A full export also advances the baseline.
+    """
+    exporter_id = exporter.info.id
+    if delta:
+        items, current_fps = library.changed_since_snapshot(exporter_id)
+    else:
+        items = library.all_items()
+        current_fps = library.fingerprints()
+
     rows = exporter.build(items)
+    library.save_snapshot(exporter_id, current_fps)
     return rows, {
         "library": True,
+        "delta": delta,
+        "changed_titles": len(items) if delta else None,
+        "library_total": library.count(),
         "library_counts_by_type": library.counts_by_type(),
         "rows": len(rows),
         "row_counts_by_type": _count_by_type(rows),

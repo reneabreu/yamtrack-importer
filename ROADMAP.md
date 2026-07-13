@@ -42,12 +42,21 @@ progress/score, widest date range, unioned provenance (smart auto-merge). A
 **Library** page browses/exports/clears it; the CLI has `ingest` /
 `export-library` / `clear-library`.
 
+Exports can be **full** or **delta** ("changes only"): each destination snapshots
+the library when it exports, so the next delta contains just the titles added or
+changed since (new episodes, rewatches, status/score). Baselines are per-exporter.
+
+Anime matching uses the **official MyAnimeList API** when a Client ID is set,
+falling back to the keyless **Jikan** mirror otherwise.
+
 Still possible later:
 
 - Per-title conflict review UI (choose a winner when sources disagree) as an
   alternative to the automatic merge.
 - Manual edits and removals of library entries from the web UI.
 - Source-priority overrides (e.g. always prefer Crunchyroll's data for anime).
+- MAL as a first-class OAuth source/exporter (read/write a user's anime list
+  directly), building on the official-API client.
 
 ## Sources
 

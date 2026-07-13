@@ -15,6 +15,19 @@
     </div>
   </div>
 
+  <div class="card">
+    <div class="eyebrow" style="margin-bottom:14px">MyAnimeList · optional, improves anime matching</div>
+    <label style="margin-top:0">MAL Client ID
+      <span class="hint">(register an app at myanimelist.net/apiconfig)</span></label>
+    <div class="key-row">
+      <input type="password" name="mal_client_id"
+             placeholder="{{ masked(mal_client_id) or 'Blank = use the free Jikan API' }}">
+      {% if mal_client_id %}<span class="saved">✓ saved</span>{% endif %}
+    </div>
+    <span class="hint">When set, anime is matched via the official MAL API (better results,
+      higher rate limits). Left blank, the keyless Jikan API is used.</span>
+  </div>
+
   <div style="display:flex;gap:12px">
     <button type="submit">Save settings</button>
     <a class="btn secondary" href="{{ url_for('index') }}">Back</a>

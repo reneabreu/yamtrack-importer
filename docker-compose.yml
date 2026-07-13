@@ -11,8 +11,9 @@ services:
     volumes:
       - ./data:/data
     environment:
-      # Optional default; you can also set this on the Settings page.
+      # Optional defaults; you can also set these on the Settings page.
       - TMDB_API_KEY=${TMDB_API_KEY:-}
+      - MAL_CLIENT_ID=${MAL_CLIENT_ID:-}
       # Change in production.
       - SECRET_KEY=${SECRET_KEY:-change-me}
       - MAX_UPLOAD_MB=200

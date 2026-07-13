@@ -12,6 +12,7 @@ One table, one JSON blob per title — the library speaks the canonical
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -29,7 +30,39 @@ CREATE TABLE IF NOT EXISTS items (
     updated_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_items_type ON items(media_type);
+
+CREATE TABLE IF NOT EXISTS export_snapshots (
+    exporter_id  TEXT PRIMARY KEY,
+    taken_at     TEXT NOT NULL,
+    fingerprints TEXT NOT NULL         -- JSON {identity: content-hash}
+);
 """
+
+
+def item_fingerprint(it: MediaItem) -> str:
+    """A content hash of the fields that make a title "changed" for export.
+
+    Covers status/progress/score/dates and per-episode watches + rewatches, so a
+    new episode or an incremented rewatch flips the fingerprint (and thus shows
+    up in a delta export), while re-importing identical data does not.
+    """
+    payload = {
+        "status": it.status.value,
+        "score": it.score,
+        "progress": it.progress,
+        "total": it.total,
+        "repeats": it.repeats,
+        "started_at": it.started_at.isoformat() if it.started_at else None,
+        "completed_at": it.completed_at.isoformat() if it.completed_at else None,
+        "favorite": it.favorite,
+        "ids": {k: it.ids[k] for k in sorted(it.ids)},
+        "episodes": sorted(
+            (e.season, e.number, e.watched_at.isoformat() if e.watched_at else None, e.repeats)
+            for e in it.episodes
+        ),
+    }
+    blob = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 
 def _dt(s: str | None):
@@ -153,5 +186,43 @@ class Library:
     def clear(self) -> int:
         n = self.count()
         self._conn.execute("DELETE FROM items")
+        self._conn.execute("DELETE FROM export_snapshots")
         self._conn.commit()
         return n
+
+    # ---- delta / export snapshots ----
+    def fingerprints(self) -> dict[str, str]:
+        """{identity: content-hash} for every title currently in the library."""
+        return {identity(it): item_fingerprint(it) for it in self.all_items()}
+
+    def get_snapshot(self, exporter_id: str) -> dict[str, str]:
+        row = self._conn.execute(
+            "SELECT fingerprints FROM export_snapshots WHERE exporter_id=?", (exporter_id,)
+        ).fetchone()
+        return json.loads(row["fingerprints"]) if row else {}
+
+    def save_snapshot(self, exporter_id: str, fingerprints: dict[str, str]) -> None:
+        self._conn.execute(
+            "INSERT INTO export_snapshots(exporter_id, taken_at, fingerprints) "
+            "VALUES(?,?,?) ON CONFLICT(exporter_id) DO UPDATE SET "
+            "taken_at=excluded.taken_at, fingerprints=excluded.fingerprints",
+            (exporter_id, datetime.utcnow().isoformat(),
+             json.dumps(fingerprints, ensure_ascii=False)),
+        )
+        self._conn.commit()
+
+    def changed_since_snapshot(self, exporter_id: str) -> tuple[list[MediaItem], dict[str, str]]:
+        """Items new or modified since the last export for this exporter.
+
+        Returns (changed_items, current_fingerprints). Saving the returned
+        fingerprints as the new snapshot resets the delta baseline.
+        """
+        snap = self.get_snapshot(exporter_id)
+        changed, current = [], {}
+        for it in self.all_items():
+            key = identity(it)
+            fp = item_fingerprint(it)
+            current[key] = fp
+            if snap.get(key) != fp:
+                changed.append(it)
+        return changed, current

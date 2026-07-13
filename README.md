@@ -106,6 +106,11 @@ Crunchyroll gives you one merged collection, not overlapping duplicates. On the
 Library page you can browse everything (with the sources each title came from),
 re-export it as CSV or JSON at any time, or clear it to start fresh.
 
+Each destination also offers a **Changes only** export: it snapshots the library
+whenever you export, so the next "changes only" download contains just the titles
+added or changed since — new episodes, rewatches, status or score updates. Handy
+for topping up Yamtrack after you watch more, without re-importing everything.
+
 Every run is also saved under **History** (in the data volume): re-open a past
 summary or re-download its CSV without reprocessing. Unmatched titles can be
 fixed right on the result page — paste the correct TMDB/MAL id and Save (writes
@@ -150,6 +155,11 @@ You need a **TMDB API key** (free): create one at
 <https://www.themoviedb.org/settings/api>. Either a v3 key or a v4 read token
 works.
 
+Optionally, set a **MyAnimeList Client ID** (`MAL_CLIENT_ID` / `--mal-client-id`,
+or the Settings page) to match anime via the official MAL API instead of the
+free Jikan mirror — better results and higher rate limits. Register an app at
+<https://myanimelist.net/apiconfig> (no OAuth needed for search).
+
 ## Usage
 
 Point `--export` at your extracted GDPR folder (the one containing
@@ -179,6 +189,14 @@ python migrate.py export-library --exporter yamtrack --out yamtrack_import.csv
 The library is a SQLite file (`--library`, default `library.db`). Titles seen on
 more than one source merge into a single entry — union of episodes, highest
 progress/score, widest date range. `clear-library` empties it.
+
+Add `--delta` to `export-library` to write only titles added or changed since
+this exporter's last export (new episodes, rewatches, status/score). Exporting
+advances the baseline, so a follow-up `--delta` starts fresh:
+
+```bash
+python migrate.py export-library --exporter yamtrack --out changes.csv --delta
+```
 
 ### Useful flags
 
