@@ -11,7 +11,8 @@ new sources, bug fixes, docs — are welcome.
    smoke test on every PR; doc-only changes skip CI. The Docker image is never
    built from a PR — it's only published on a release (see **Releasing**).
 
-Keep PRs focused, and update the `README.md` / `ROADMAP.md` when behavior changes.
+Keep PRs focused, and update `README.md` / `ROADMAP.md` when behavior changes and
+add a note under **Unreleased** in [CHANGELOG.md](CHANGELOG.md).
 
 ## Local development
 

@@ -1,13 +1,43 @@
+# The image only needs: requirements.txt, yamtrack_importer/, webapp/, migrate.py
+# Everything below is kept out of the build context.
+
+# VCS, CI, and docs
 .git
 .gitignore
+.github/
+*.md
+LICENSE
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Python caches / build artifacts
 __pycache__/
-*.pyc
-data/
-tv time/
-*.zip
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets and local config
 .env
+.env.*
+
+# Runtime data volume, caches, and generated files
+data/
 tmdb_cache.json
+mal_cache.json
+crunchyroll_history.json
+overrides.json
+overrides.template.json
 migration_report.json
 push_failures.log
 yamtrack_import.csv
-README.md
+
+# User exports
+tv time/
+*.zip
+
+# OS cruft
+.DS_Store
