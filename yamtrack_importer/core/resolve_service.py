@@ -52,7 +52,7 @@ class ResolutionService:
                 elif it.media_type == MediaType.TV:
                     self._tv(it, tmdb, mal, req, supports, reroute_anime, stats, emit)
                 elif it.media_type == MediaType.ANIME:
-                    self._anime(it, mal, stats)
+                    self._anime(it, mal, stats, req)
             except Exception as exc:  # a bad title shouldn't kill the run
                 it.resolve_note = f"error: {exc}"
             if i % 25 == 0:
@@ -71,7 +71,10 @@ class ResolutionService:
 
     # ---- per media type ----
     def _movie(self, it, tmdb, req, stats):
-        provider = req.get("movie", "tmdb")
+        provider = req.get("movie")
+        if not provider:          # exporter needs no external id -> pass through
+            it.resolved = True
+            return
         data = tmdb.resolve_movie_by_title(it.title, it.year) if provider == "tmdb" else None
         if not data or not data.get("tmdb_id"):
             it.resolve_note = (data or {}).get("note", "not found")
@@ -82,6 +85,9 @@ class ResolutionService:
         it.resolved = True
 
     def _tv(self, it, tmdb, mal, req, supports, reroute_anime, stats, emit):
+        if not req.get("tv"):     # exporter needs no external id -> pass through
+            it.resolved = True
+            return
         data = tmdb.resolve_tv(it.ids.get("tvdb"), it.title)
         if not data or not data.get("tmdb_id"):
             it.resolve_note = (data or {}).get("note", "not found")
@@ -113,7 +119,10 @@ class ResolutionService:
             it.status = Status.IN_PROGRESS
         self._anime(it, mal, stats)
 
-    def _anime(self, it, mal, stats):
+    def _anime(self, it, mal, stats, req=None):
+        if req is not None and not req.get("anime"):
+            it.resolved = True
+            return
         data = mal.resolve_anime_by_title(it.title) if mal else None
         if not data or not data.get("mal_id"):
             it.resolve_note = (data or {}).get("note", "not found") if data else "not found"

@@ -3,28 +3,28 @@
 from __future__ import annotations
 
 from ..api_client import YamtrackClient
-from ..build_records import CSV_COLUMNS, _fmt_date, _fmt_ts, _row  # shared row helpers
 from ..core.model import MediaItem, MediaType, Status
 from ..core.resolve_service import status_label
-from ..csv_writer import write_csv
+from ._rows import fmt_date as _fmt_date
+from ._rows import fmt_ts as _fmt_ts
+from ._rows import row as _row
+from ._rows import summarize_rows, write_csv
 from .base import Exporter, ExporterInfo
-
-_SOURCE = {"tmdb": "tmdb", "mal": "mal"}
 
 
 class YamtrackExporter(Exporter):
     info = ExporterInfo(
         id="yamtrack",
         label="Yamtrack",
-        modes=["csv", "api"],
-        # id provider Yamtrack keys on, per media type
+        modes=["file", "api"],
+        media_types=["tv", "movie", "anime"],
         requires={"tv": "tmdb", "movie": "tmdb", "anime": "mal"},
+        output_ext="csv",
+        output_mime="text/csv",
     )
-    # what Yamtrack can write
-    info.media_types = ["tv", "movie", "anime"]  # type: ignore[attr-defined]
 
-    def requirements(self):
-        return dict(self.info.requires)
+    def details(self, records):
+        return summarize_rows(records)
 
     # ---- canonical -> Yamtrack rows ----
     def build(self, items: list[MediaItem]) -> list[dict]:
@@ -97,7 +97,7 @@ class YamtrackExporter(Exporter):
         return rows
 
     # ---- outputs ----
-    def write_csv(self, rows: list[dict], out_path: str) -> int:
+    def write(self, rows: list[dict], out_path: str) -> int:
         return write_csv(rows, out_path)
 
     def check_connection(self, settings: dict):
@@ -131,7 +131,3 @@ class YamtrackExporter(Exporter):
         emit(type="log", msg=f"Done. created={created} skipped={skipped} failed={failed}")
         return {"created": created, "skipped": skipped, "failed": failed,
                 "dry_run": dry_run, "failures": failures}
-
-
-# columns re-exported for the CSV writer
-__all__ = ["YamtrackExporter", "CSV_COLUMNS"]

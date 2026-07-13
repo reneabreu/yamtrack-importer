@@ -102,7 +102,7 @@ def _print_report(report: dict, report_path: str) -> None:
 
 def cmd_convert(args):
     rows, _ = _run_pipeline(args)
-    n = get_exporter("yamtrack").write_csv(rows, args.out)
+    n = get_exporter("yamtrack").write(rows, args.out)
     print(f"Wrote {n} rows -> {args.out}")
     print("Upload it in Yamtrack: Settings -> Import -> Yamtrack CSV.")
 

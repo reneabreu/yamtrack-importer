@@ -85,16 +85,6 @@ class MALResolver:
             data = {**data, **self._by_id(int(data["mal_id"]))}
         return data
 
-    def resolve_anime(self, anime) -> None:
-        data = self.resolve_anime_by_title(anime.title)
-        if not data or not data.get("mal_id"):
-            anime.resolve_note = "not found"
-            return
-        anime.mal_id = int(data["mal_id"])
-        anime.mal_title = data.get("title") or anime.title
-        anime.total_episodes = data.get("episodes")
-        anime.resolve_note = data.get("note", "manual override")
-
     def _by_id(self, mal_id: int) -> dict:
         got = self._get(f"/anime/{mal_id}", {})
         info = (got or {}).get("data") or {}

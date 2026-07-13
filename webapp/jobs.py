@@ -36,6 +36,8 @@ class Job:
         self.source_label = ""
         self.mode = "csv"
         self.csv_path: str | None = None  # set for csv mode when finished
+        self.download_name = "yamtrack_import.csv"
+        self.download_mime = "text/csv"
         self.summary: dict | None = None  # report + push stats
         self.error: str | None = None
 
@@ -92,11 +94,13 @@ def _persist(job: Job) -> None:
             "mode": job.mode,
             "summary": job.summary,
             "csv": None,
+            "download_name": job.download_name,
+            "mime": job.download_mime,
         }
         if job.csv_path and os.path.exists(job.csv_path):
-            dest = os.path.join(rec_dir, "import.csv")
-            shutil.copyfile(job.csv_path, dest)
-            meta["csv"] = "import.csv"
+            fname = "output" + os.path.splitext(job.csv_path)[1]
+            shutil.copyfile(job.csv_path, os.path.join(rec_dir, fname))
+            meta["csv"] = fname
         with open(os.path.join(rec_dir, "meta.json"), "w", encoding="utf-8") as fh:
             json.dump(meta, fh, ensure_ascii=False, indent=2)
         _prune_history()

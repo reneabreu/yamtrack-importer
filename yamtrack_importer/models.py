@@ -1,17 +1,9 @@
-"""Normalized data structures shared across the pipeline."""
+"""Internal record types used by the TV Time parser (parse.py)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-
-
-# Yamtrack status labels (from app.models.Status in the Yamtrack source).
-STATUS_COMPLETED = "Completed"
-STATUS_IN_PROGRESS = "In progress"
-STATUS_PLANNING = "Planning"
-STATUS_PAUSED = "Paused"
-STATUS_DROPPED = "Dropped"
 
 
 @dataclass
@@ -62,24 +54,6 @@ class ShowRecord:
     @property
     def watched_seasons(self) -> list[int]:
         return sorted({s for (s, _e) in self.episodes})
-
-
-@dataclass
-class AnimeRecord:
-    """An anime series tracked on an anime-native service (e.g. Crunchyroll)."""
-
-    title: str
-    progress: int = 0                 # episodes watched
-    status: str = STATUS_IN_PROGRESS
-    start_date: datetime | None = None
-    end_date: datetime | None = None
-    score: float | None = None        # 0-10
-
-    # Filled in during resolution (MAL via Jikan).
-    mal_id: int | None = None
-    mal_title: str | None = None
-    total_episodes: int | None = None
-    resolve_note: str = ""
 
 
 @dataclass

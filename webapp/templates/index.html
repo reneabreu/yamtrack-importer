@@ -113,7 +113,20 @@
     <section class="step" data-step="3" hidden>
       <div class="eyebrow">Step 3 of 3</div>
       <h2>Where should it go?</h2>
-      <p class="sub">Choose an output, review the run, and start the migration.</p>
+      <p class="sub">Choose a destination and output, review the run, and start the migration.</p>
+
+      {% if exporters and exporters|length > 1 %}
+      <label>Destination</label>
+      <select name="exporter" id="exporter-select"
+              style="width:100%;max-width:320px;margin:6px 0 18px;padding:9px 11px;
+                     background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px">
+        {% for e in exporters %}
+          <option value="{{ e.id }}" {{ 'selected' if e.id == default_exporter }}>{{ e.label }}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <input type="hidden" name="exporter" value="{{ default_exporter }}">
+      {% endif %}
 
       <div class="mode-grid">
         <label class="mode">

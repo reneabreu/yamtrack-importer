@@ -27,7 +27,7 @@ from flask import (
 
 from yamtrack_importer.api_client import YamtrackClient
 from yamtrack_importer.core.pipeline import run as run_pipeline
-from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, get_exporter
+from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, all_exporters, get_exporter
 from yamtrack_importer.mal import MALResolver
 from yamtrack_importer.resolve import TMDBResolver
 from yamtrack_importer.sources.registry import all_sources, get_source
@@ -62,6 +62,8 @@ def index():
     return render_template(
         "index.html",
         sources=[s.info for s in all_sources()],
+        exporters=[e.info for e in all_exporters()],
+        default_exporter=DEFAULT_EXPORTER,
         has_tmdb=bool(settings.get("tmdb_key")),
         has_yamtrack=bool(settings.get("yamtrack_url") and settings.get("yamtrack_key")),
         cr_cookie_remembered=bool(_SESSION_SECRETS.get("crunchyroll_etp_rt")),
@@ -179,6 +181,7 @@ def start():
     """Accept the upload + options, launch a background job, return its id."""
     source_id = request.form.get("source", "")
     mode = request.form.get("mode", "csv")
+    exporter_id = request.form.get("exporter", DEFAULT_EXPORTER)
     dry_run = bool(request.form.get("dry_run"))
     try:
         source = get_source(source_id)
@@ -186,6 +189,10 @@ def start():
         return jsonify(error="Unknown source."), 400
     if not source.info.ready:
         return jsonify(error=f"{source.info.label} is not available yet."), 400
+    try:
+        get_exporter(exporter_id)
+    except KeyError:
+        return jsonify(error="Unknown destination."), 400
 
     settings = config.load_settings()
     options = {
@@ -224,19 +231,20 @@ def start():
     job = jobs.create_job()
 
     def worker(job):
-        _run_migration(job, source, files, settings, options, mode, dry_run, work_dir)
+        _run_migration(job, source, files, settings, options, mode, dry_run, work_dir, exporter_id)
 
     jobs.run_async(job, worker)
     return jsonify(job_id=job.id)
 
 
-def _run_migration(job, source, files, settings, options, mode, dry_run, work_dir):
+def _run_migration(job, source, files, settings, options, mode, dry_run, work_dir, exporter_id):
     job.source_label = source.info.label
     job.mode = mode
-    exporter = get_exporter(DEFAULT_EXPORTER)
+    exporter = get_exporter(exporter_id)
 
-    # TMDB is only needed if the source produces TV/movies.
-    needs_tmdb = any(t in ("tv", "movie") for t in source.info.media_types)
+    # A TMDB key is only needed if this exporter resolves any source type via TMDB.
+    reqs = exporter.requirements()
+    needs_tmdb = any(reqs.get(t) == "tmdb" for t in source.info.media_types)
     if needs_tmdb and not settings.get("tmdb_key"):
         raise RuntimeError("A TMDB API key is required. Set it on the Settings page.")
 
@@ -245,14 +253,19 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
     rows, report = run_pipeline(source, files, options, exporter, providers, progress=job.emit)
 
     if mode == "csv":
-        out_path = os.path.join(work_dir, f"{source.info.id}_{exporter.info.id}_import.csv")
-        exporter.write_csv(rows, out_path)
+        ext = exporter.info.output_ext
+        out_path = os.path.join(work_dir, f"{source.info.id}_{exporter.info.id}_import.{ext}")
+        exporter.write(rows, out_path)
         job.csv_path = out_path
+        job.download_name = f"{source.info.id}_{exporter.info.id}.{ext}"
+        job.download_mime = exporter.info.output_mime
         job.summary = {"mode": "csv", "report": report, "download": True}
-        job.emit(type="log", msg=f"Wrote {len(rows)} rows to CSV. Ready to download.")
+        job.emit(type="log", msg=f"Wrote {len(rows)} records. Ready to download.")
         return
 
     # push
+    if "api" not in exporter.info.modes:
+        raise RuntimeError(f"{exporter.info.label} has no API mode — use a file download.")
     if not dry_run:
         ok, detail = exporter.check_connection(settings)
         if not ok:
@@ -288,12 +301,17 @@ def progress(job_id):
 @app.route("/download/<job_id>")
 def download(job_id):
     job = jobs.get_job(job_id)
-    path = job.csv_path if (job and job.csv_path) else jobs.record_csv_path(job_id)
+    if job and job.csv_path and os.path.exists(job.csv_path):
+        path, name, mime = job.csv_path, job.download_name, job.download_mime
+    else:
+        rec = jobs.get_record(job_id)
+        path = jobs.record_csv_path(job_id)
+        name = (rec or {}).get("download_name", "yamtrack_import.csv")
+        mime = (rec or {}).get("mime", "text/csv")
     if not path or not os.path.exists(path):
         flash("Nothing to download (run expired?).", "err")
         return redirect(url_for("index"))
-    return send_file(path, as_attachment=True, download_name="yamtrack_import.csv",
-                     mimetype="text/csv")
+    return send_file(path, as_attachment=True, download_name=name, mimetype=mime)
 
 
 @app.route("/result/<job_id>")

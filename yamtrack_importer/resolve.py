@@ -18,8 +18,6 @@ from difflib import SequenceMatcher
 
 import requests
 
-from .models import MovieRecord, ShowRecord
-
 logger = logging.getLogger(__name__)
 
 TMDB_BASE = "https://api.themoviedb.org/3"
@@ -135,20 +133,6 @@ class TMDBResolver:
             data = enriched
         return data
 
-    def resolve_show(self, show: ShowRecord) -> None:
-        data = self.resolve_tv(show.tvdb_id, show.name)
-        if not data or not data.get("tmdb_id"):
-            show.resolve_note = (data or {}).get("note", "not found")
-            return
-        show.tmdb_id = int(data["tmdb_id"])
-        show.tmdb_title = data.get("title")
-        show.total_episodes = data.get("total_episodes")
-        show.is_anime = bool(data.get("is_anime", False))
-        show.season_episode_counts = {
-            int(k): int(v) for k, v in (data.get("season_episode_counts") or {}).items()
-        }
-        show.resolve_note = data.get("note", "")
-
     def _lookup_tv(self, tvdb_id, name: str) -> dict | None:
         tmdb_id = None
         note = ""
@@ -197,15 +181,6 @@ class TMDBResolver:
         override = self.overrides.get(f"movie:{title.lower()}|{year or ''}")
         cache_key = f"movie:{title.lower()}|{year or ''}"
         return self._resolve(cache_key, override, lambda: self._lookup_movie_by(title, year))
-
-    def resolve_movie(self, movie: MovieRecord) -> None:
-        data = self.resolve_movie_by_title(movie.name, movie.year)
-        if not data or not data.get("tmdb_id"):
-            movie.resolve_note = (data or {}).get("note", "not found")
-            return
-        movie.tmdb_id = int(data["tmdb_id"])
-        movie.tmdb_title = data.get("title")
-        movie.resolve_note = data.get("note", "")
 
     def _lookup_movie_by(self, title: str, year) -> dict | None:
         params = {"query": title}

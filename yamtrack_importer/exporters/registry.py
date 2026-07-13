@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .base import Exporter
+from .canonical_json import CanonicalJSONExporter
 from .yamtrack import YamtrackExporter
 
 _REGISTRY: dict[str, Exporter] = {}
@@ -13,6 +14,7 @@ def _register(exporter: Exporter) -> None:
 
 
 _register(YamtrackExporter())
+_register(CanonicalJSONExporter())
 
 
 def get_exporter(exporter_id: str) -> Exporter:

@@ -6,7 +6,6 @@ a neutral report used by the UI.
 
 from __future__ import annotations
 
-from ..build_records import summarize_rows
 from .model import MediaType
 from .resolve_service import ResolutionService
 
@@ -55,7 +54,7 @@ def run(source, inputs, options, exporter, providers, progress=None):
         "unmatched_movies": unmatched_movies,
         "overrides_scaffold": {u["override_key"]: _scaffold(u) for u in unmatched},
         "row_counts_by_type": _count_by_type(rows),
-        "details": summarize_rows(rows),
+        "details": exporter.details(rows),
     }
     return rows, report
 

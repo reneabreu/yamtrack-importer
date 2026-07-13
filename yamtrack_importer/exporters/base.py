@@ -11,10 +11,13 @@ from ..core.model import MediaItem
 class ExporterInfo:
     id: str
     label: str
-    modes: list[str] = field(default_factory=lambda: ["csv"])   # "csv" and/or "api"
+    modes: list[str] = field(default_factory=lambda: ["file"])   # "file" and/or "api"
+    media_types: list[str] = field(default_factory=list)          # types it can write
     # media_type value -> id provider this exporter needs (e.g. {"tv": "tmdb"}).
-    # An empty/missing entry means the exporter matches by title itself.
+    # Empty means the exporter needs no external resolution.
     requires: dict[str, str] = field(default_factory=dict)
+    output_ext: str = "csv"
+    output_mime: str = "text/csv"
 
 
 class Exporter:
@@ -25,15 +28,22 @@ class Exporter:
     def requirements(self) -> dict[str, str]:
         return dict(self.info.requires)
 
-    # ---- CSV mode ----
-    def to_csv(self, items: list[MediaItem], out_path: str) -> int:
-        """Write ``items`` to ``out_path``; return the number of records written."""
+    # ---- records ----
+    def build(self, items: list[MediaItem]) -> list[dict]:
+        """Turn canonical items into this destination's record dicts."""
         raise NotImplementedError
+
+    def write(self, records: list[dict], out_path: str) -> int:
+        """Write records to a file; return the count."""
+        raise NotImplementedError
+
+    def details(self, records: list[dict]) -> list[dict]:
+        """A per-title review summary for the result page (optional)."""
+        return []
 
     # ---- API mode ----
     def check_connection(self, settings: dict) -> tuple[bool, str]:
         return False, "This exporter has no API mode."
 
-    def push(self, items, settings, dry_run=False, progress=None) -> dict:
-        """Send ``items`` to the destination; return a stats dict."""
+    def push(self, records, settings, dry_run=False, progress=None) -> dict:
         raise NotImplementedError
