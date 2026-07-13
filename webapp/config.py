@@ -5,6 +5,31 @@ from __future__ import annotations
 import json
 import os
 
+
+def load_dotenv(path: str = ".env") -> None:
+    """Seed os.environ from a .env file (does not override real env vars).
+
+    Under Docker Compose these come in as real environment variables; when
+    running the app directly (``python -m webapp.app``) this lets the Settings
+    page pick up keys like TMDB_API_KEY / MAL_CLIENT_ID from .env too.
+    """
+    # look in the current dir first, then the project root (parent of webapp/)
+    candidates = [path, os.path.join(os.path.dirname(os.path.dirname(__file__)), path)]
+    for p in candidates:
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        return
+
+
+load_dotenv()
+
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 CACHE_PATH = os.path.join(DATA_DIR, "tmdb_cache.json")
