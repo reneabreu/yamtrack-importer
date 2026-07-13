@@ -89,6 +89,7 @@
     </a>
     <nav>
       <a href="{{ url_for('index') }}" class="{{ 'active' if active == 'migrate' }}">Migrate</a>
+      <a href="{{ url_for('library_view') }}" class="{{ 'active' if active == 'library' }}">Library</a>
       <a href="{{ url_for('history') }}" class="{{ 'active' if active == 'history' }}">History</a>
       <a href="{{ url_for('settings_view') }}" class="{{ 'active' if active == 'settings' }}">Settings</a>
       {% if tmdb_ok is defined %}

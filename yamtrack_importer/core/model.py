@@ -65,6 +65,8 @@ class MediaItem:
     favorite: bool = False
     notes: str = ""
     episodes: list[EpisodeWatch] = field(default_factory=list)
+    # provenance: source ids this item's data came from (e.g. ["tvtime", "crunchyroll"])
+    sources: list[str] = field(default_factory=list)
 
     # --- resolution bookkeeping (filled by the resolution layer) ---
     resolved: bool = False

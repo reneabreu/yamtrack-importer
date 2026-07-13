@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% set active = 'library' %}
+{% block body %}
+
+<h1>Library</h1>
+<p class="sub">Every source you import is merged into one deduplicated collection.
+  Export the whole thing whenever you like.</p>
+
+{% if total %}
+<div class="stats">
+  <div class="stat"><div class="num mono">{{ total }}</div><div class="lbl">Titles</div></div>
+  {% for t, n in counts.items() %}
+  <div class="stat"><div class="num mono">{{ n }}</div><div class="lbl">{{ t }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="lib-actions">
+  <div class="exports">
+    {% for e in exporters %}
+    <a class="btn" href="{{ url_for('library_export', exporter_id=e.id) }}">↓ Export {{ e.output_ext|upper }}</a>
+    {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('library_clear') }}"
+        onsubmit="return confirm('Clear the entire library? This cannot be undone.');">
+    <button type="submit" class="danger">Clear library</button>
+  </form>
+</div>
+
+<details class="review-data" open>
+  <summary>Contents <span class="count">{{ details|length }} titles</span></summary>
+  <div class="dtl-tools">
+    <input type="search" id="dtl-filter" placeholder="Filter by title…">
+  </div>
+  <div class="tbl detail-tbl" id="dtl-tbl">
+    <div class="tr th dtl">
+      <span>Type</span><span>Title</span><span>Episodes</span><span>Rewatches</span>
+      <span>Status</span><span>Score</span><span>Sources</span>
+    </div>
+    {% for d in details %}
+    <div class="tr dtl" data-title="{{ d.title|lower }}">
+      <span><span class="kind kind-{{ d.type }}">{{ d.type }}</span></span>
+      <span title="{{ d.title }}">{{ d.title }}</span>
+      <span class="mono">{{ d.episodes }}</span>
+      <span class="mono mut">{{ d.rewatches }}</span>
+      <span class="mut">{{ d.status }}</span>
+      <span class="mono">{{ d.score }}</span>
+      <span>{% for s in d.sources %}<span class="src-chip">{{ s }}</span>{% endfor %}</span>
+    </div>
+    {% endfor %}
+  </div>
+</details>
+{% else %}
+<div class="card" style="text-align:center;padding:44px 20px">
+  <p style="font-size:15px;margin:0 0 6px">Your library is empty.</p>
+  <p class="hint" style="margin:0 0 18px">Run an import and it will be added here.</p>
+  <a class="btn" href="{{ url_for('index') }}">Import something</a>
+</div>
+{% endif %}
+
+<style>
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .stat .num{font-size:24px;font-weight:600}
+  .stat .lbl{color:var(--mut);font-size:12.5px;margin-top:3px;text-transform:capitalize}
+
+  .lib-actions{display:flex;align-items:center;justify-content:space-between;
+    gap:12px;flex-wrap:wrap;margin-bottom:20px}
+  .lib-actions .exports{display:flex;gap:10px;flex-wrap:wrap}
+
+  .review-data{border:1px solid var(--line);border-radius:12px;background:var(--card);
+    margin-bottom:22px;overflow:hidden}
+  .review-data>summary{cursor:pointer;padding:14px 16px;font-weight:600;font-size:14px;
+    list-style:none;display:flex;align-items:center;gap:10px}
+  .review-data>summary::-webkit-details-marker{display:none}
+  .review-data>summary::before{content:"▸";color:var(--mut);transition:transform .15s}
+  .review-data[open]>summary::before{transform:rotate(90deg)}
+  .review-data .count{color:var(--mut);font-size:12.5px;font-weight:400}
+  .dtl-tools{padding:0 16px 12px}
+  .dtl-tools input{width:100%;max-width:280px;padding:8px 11px;font-size:13px;
+    background:var(--panel,var(--card2));border:1px solid var(--line);border-radius:8px;color:var(--txt)}
+
+  .tbl{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .review-data .tbl{border:0;border-top:1px solid var(--line);border-radius:0;
+    max-height:520px;overflow:auto}
+  .tr{display:grid;padding:11px 14px;align-items:center;font-size:13.5px;
+    border-top:1px solid var(--card2)}
+  .tr:first-child{border-top:0}
+  .tr.th{background:var(--card2);font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--mut)}
+  .tr.dtl{grid-template-columns:64px 1.5fr 84px 90px 104px 56px 1.1fr;gap:12px}
+  .tr.dtl span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tr .mut{color:var(--mut)}
+  .kind{font-family:var(--mono);font-size:11px;border-radius:5px;padding:2px 7px}
+  .kind-tv{color:#8fb4ff;background:rgba(143,180,255,.1)}
+  .kind-movie{color:#ffc48f;background:rgba(255,196,143,.1)}
+  .kind-anime{color:#c9b6ff;background:rgba(201,182,255,.1)}
+  .src-chip{font-family:var(--mono);font-size:10.5px;color:var(--mut);
+    background:var(--card2);border:1px solid var(--line);border-radius:5px;
+    padding:1px 6px;margin-right:5px}
+  @media (max-width:760px){
+    .tr.dtl{grid-template-columns:58px 1fr 70px}
+    .tr.dtl span:nth-child(n+4){display:none}
+  }
+</style>
+
+<script>
+(function () {
+  const f = document.getElementById('dtl-filter');
+  if (!f) return;
+  const rows = Array.from(document.querySelectorAll('#dtl-tbl .tr.dtl'));
+  f.addEventListener('input', function () {
+    const q = f.value.trim().toLowerCase();
+    rows.forEach(function (r) {
+      r.style.display = (!q || r.dataset.title.indexOf(q) !== -1) ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}

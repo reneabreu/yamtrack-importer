@@ -7,8 +7,10 @@ crunchyroll_history.json
 tmdb_cache.json
 tmdb_cache.json.tmp
 migration_report.json
-push_failures.log
 yamtrack_import.csv
+library.db
+library.db-journal
+*.sqlite
 __pycache__/
 *.pyc
 tv time/

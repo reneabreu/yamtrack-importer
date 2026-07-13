@@ -23,6 +23,12 @@ plugin. Available today:
   and ratings. Shows/movies match via TMDB; anime is auto-routed to MyAnimeList.
 - **Crunchyroll** — watch history matched to MyAnimeList (Jikan).
 
+Every import feeds a **local library** (a SQLite file in your data volume) that
+**deduplicates and merges** across sources — so an anime you watched on both TV
+Time and Crunchyroll becomes one entry with the union of episodes, the highest
+progress and score, and the widest date range, not two rows. Exports are built
+from the whole merged library.
+
 On the roadmap: Netflix, HBO Max, Apple TV, Globo Play, Xbox, Nintendo,
 RetroAchievements, Google Play Games, Komga, and Kavita. See
 [ROADMAP.md](ROADMAP.md).
@@ -92,15 +98,23 @@ The run streams **live progress** — a progress bar plus a console log — whil
 resolves titles and imports, so a large library that takes a few minutes shows
 exactly what it's doing.
 
-Every run is saved under **History** (in the data volume): re-open a past
+Each run is ingested into your **Library** (`Library` in the nav): a persistent,
+deduplicated collection that all sources feed into. The result page shows how
+many titles were newly added versus merged into existing ones, and the export
+you download reflects the whole library — so importing TV Time and then
+Crunchyroll gives you one merged collection, not overlapping duplicates. On the
+Library page you can browse everything (with the sources each title came from),
+re-export it as CSV or JSON at any time, or clear it to start fresh.
+
+Every run is also saved under **History** (in the data volume): re-open a past
 summary or re-download its CSV without reprocessing. Unmatched titles can be
 fixed right on the result page — paste the correct TMDB/MAL id and Save (writes
 `overrides.json` for you), then re-run. For Crunchyroll, leave the `etp_rt`
 field blank on a re-run to reuse the last fetch instead of re-downloading.
 
-Keys, the TMDB match cache, and `overrides.json` live in the `./data` volume, so
-they persist across restarts. You can also seed the key via the `TMDB_API_KEY`
-env var in `docker-compose.yml`.
+Keys, the TMDB match cache, `overrides.json`, and the library (`library.db`) live
+in the `./data` volume, so they persist across restarts. You can also seed the
+key via the `TMDB_API_KEY` env var in `docker-compose.yml`.
 
 ## Run without Docker (web UI)
 
@@ -151,6 +165,21 @@ python migrate.py convert \
 
 Then in Yamtrack: **Settings → Import → Yamtrack CSV** and upload the file.
 
+### Build a merged library (multiple sources)
+
+`convert` is a one-shot. To combine several sources and deduplicate, ingest each
+into a local library, then export the whole thing:
+
+```bash
+python migrate.py ingest --export "./tv time gdpr data"   # add TV Time
+# ...ingest other sources into the same --library...
+python migrate.py export-library --exporter yamtrack --out yamtrack_import.csv
+```
+
+The library is a SQLite file (`--library`, default `library.db`). Titles seen on
+more than one source merge into a single entry — union of episodes, highest
+progress/score, widest date range. `clear-library` empties it.
+
 ### Useful flags
 
 | Flag | Effect |
@@ -200,7 +229,8 @@ take priority.
 
 ## Files produced
 
-- `yamtrack_import.csv` — the import file (convert mode)
+- `yamtrack_import.csv` — the import file (convert / export-library)
+- `library.db` — the local deduplicated library (SQLite; ingest/export-library)
 - `tmdb_cache.json` — resolution cache (safe to keep; makes re-runs instant)
 - `migration_report.json` — match stats and unmatched list
 

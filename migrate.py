@@ -3,10 +3,17 @@
 
 Usage
 -----
-Convert to a Yamtrack import CSV, then upload it via Yamtrack -> Settings ->
-Import (Yamtrack has no media-create API; the CSV is its bulk-import path):
+One-shot: convert a source to a Yamtrack import CSV, then upload it via
+Yamtrack -> Settings -> Import (Yamtrack has no media-create API; the CSV is its
+bulk-import path):
 
     python migrate.py convert --export "./tv time gdpr data" --out yamtrack_import.csv
+
+Library: ingest one or more sources into a local, deduplicated library, then
+export the whole thing (so titles seen on multiple sources merge into one):
+
+    python migrate.py ingest --export "./tv time gdpr data"
+    python migrate.py export-library --exporter yamtrack --out yamtrack_import.csv
 
 Config can also come from a .env file (see .env.example).
 """
@@ -19,8 +26,11 @@ import logging
 import os
 import sys
 
+from yamtrack_importer.core.ingest import ingest_source
+from yamtrack_importer.core.library import Library
+from yamtrack_importer.core.pipeline import export_library
 from yamtrack_importer.core.pipeline import run as run_pipeline
-from yamtrack_importer.exporters.registry import get_exporter
+from yamtrack_importer.exporters.registry import all_exporters, get_exporter
 from yamtrack_importer.mal import MALResolver
 from yamtrack_importer.resolve import TMDBResolver
 from yamtrack_importer.sources.tvtime import TVTimeSource
@@ -55,22 +65,29 @@ def _add_common(p: argparse.ArgumentParser) -> None:
                    help="Where to write the match/unmatched report.")
 
 
-def _run_pipeline(args):
-    import os as _os
-    providers = {
+def _providers(args):
+    return {
         "tmdb": TMDBResolver(api_key=args.tmdb_key, cache_path=args.cache,
                              overrides_path=args.overrides),
         "mal": MALResolver(
-            cache_path=_os.path.join(_os.path.dirname(args.cache) or ".", "mal_cache.json"),
+            cache_path=os.path.join(os.path.dirname(args.cache) or ".", "mal_cache.json"),
             overrides_path=args.overrides),
     }
-    options = {
+
+
+def _options(args):
+    return {
         "include_shows": not args.no_shows,
         "include_movies": not args.no_movies,
         "include_watchlist": not args.no_watchlist,
         "include_ratings": not args.no_ratings,
         "include_anime_as_anime": not args.no_anime,
     }
+
+
+def _run_pipeline(args):
+    providers = _providers(args)
+    options = _options(args)
     rows, report = run_pipeline(
         TVTimeSource(), {"export": args.export}, options, get_exporter("yamtrack"), providers
     )
@@ -103,23 +120,65 @@ def cmd_convert(args):
     print("Upload it in Yamtrack: Settings -> Import -> Yamtrack CSV.")
 
 
+def cmd_ingest(args):
+    with Library(args.library) as lib:
+        result = ingest_source(
+            lib, TVTimeSource(), {"export": args.export}, _options(args), _providers(args)
+        )
+        ing = result["ingest"]
+        print(f"Ingested into {args.library}: +{ing['added']} new, {ing['merged']} merged "
+              f"— {ing['total']} titles total.")
+
+
+def cmd_export_library(args):
+    with Library(args.library) as lib:
+        rows, _ = export_library(lib, get_exporter(args.exporter))
+        if not rows:
+            sys.exit("Library is empty — run `ingest` first.")
+        n = get_exporter(args.exporter).write(rows, args.out)
+    print(f"Wrote {n} rows -> {args.out}")
+
+
+def cmd_clear_library(args):
+    with Library(args.library) as lib:
+        n = lib.clear()
+    print(f"Cleared {n} title(s) from {args.library}.")
+
+
 def main(argv=None):
     _load_dotenv()
     parser = argparse.ArgumentParser(description="Migrate TV Time data to Yamtrack.")
     parser.add_argument("-v", "--verbose", action="store_true")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_conv = sub.add_parser("convert", help="Write a Yamtrack import CSV.")
+    p_conv = sub.add_parser("convert", help="One-shot: write a Yamtrack import CSV.")
     _add_common(p_conv)
     p_conv.add_argument("--out", default="yamtrack_import.csv", help="Output CSV path.")
     p_conv.set_defaults(func=cmd_convert)
+
+    p_ing = sub.add_parser("ingest", help="Add a source to the local library (dedup/merge).")
+    _add_common(p_ing)
+    p_ing.add_argument("--library", default="library.db", help="SQLite library path.")
+    p_ing.set_defaults(func=cmd_ingest)
+
+    exporter_ids = [e.info.id for e in all_exporters()]
+    p_exp = sub.add_parser("export-library", help="Export the whole library to a file.")
+    p_exp.add_argument("--library", default="library.db", help="SQLite library path.")
+    p_exp.add_argument("--exporter", default="yamtrack", choices=exporter_ids,
+                       help="Destination format.")
+    p_exp.add_argument("--out", default="yamtrack_import.csv", help="Output file path.")
+    p_exp.set_defaults(func=cmd_export_library)
+
+    p_clr = sub.add_parser("clear-library", help="Empty the local library.")
+    p_clr.add_argument("--library", default="library.db", help="SQLite library path.")
+    p_clr.set_defaults(func=cmd_clear_library)
 
     args = parser.parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(levelname)s %(message)s",
     )
-    if not args.tmdb_key:
+    if args.command in ("convert", "ingest") and not args.tmdb_key:
         sys.exit("A TMDB API key is required. Set --tmdb-key or TMDB_API_KEY in .env.")
     args.func(args)
 

@@ -33,6 +33,22 @@ sources — the foundation for making this the base of a larger media-tracking
 system. Destinations with a real create-API can implement the exporter's
 `push` path; Yamtrack has no such API, so it stays file-only.
 
+## Local library — cross-source dedup ✅
+
+Sources feed a persistent **SQLite library** (`library.db`) keyed by canonical id
+(TMDB for screen media, MAL for anime). Re-importing or importing a second source
+merges into existing entries instead of duplicating — union of episodes, highest
+progress/score, widest date range, unioned provenance (smart auto-merge). A
+**Library** page browses/exports/clears it; the CLI has `ingest` /
+`export-library` / `clear-library`.
+
+Still possible later:
+
+- Per-title conflict review UI (choose a winner when sources disagree) as an
+  alternative to the automatic merge.
+- Manual edits and removals of library entries from the web UI.
+- Source-priority overrides (e.g. always prefer Crunchyroll's data for anime).
+
 ## Sources
 
 | Source | Status | Yamtrack type | Matching |

@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Local library with cross-source dedup**: every import is ingested into a
+  persistent SQLite library (`library.db` in the data volume) keyed by canonical
+  id (TMDB for screen media, MAL for anime). A title seen on more than one source
+  (e.g. an anime on both TV Time and Crunchyroll) merges into one entry —
+  union of episodes, highest progress/score, widest date range, unioned
+  provenance — instead of duplicating. A **Library** page browses the merged
+  collection and re-exports it (CSV/JSON) or clears it; CLI adds `ingest`,
+  `export-library`, and `clear-library`. Exports are built from the whole library.
+
 ### Changed
 
 - **Modular import/export architecture**: sources (imports) and exporters

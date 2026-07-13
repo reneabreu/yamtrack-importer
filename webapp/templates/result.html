@@ -7,7 +7,8 @@
   <div>
     <h2>Migration complete</h2>
     <p class="sub" style="margin:0">
-      {% if mode == 'csv' %}CSV generated — {{ report.rows }} rows ready to import into Yamtrack.
+      {% if report.library %}Merged into your library — {{ report.rows }} rows ready to import into Yamtrack.
+      {% elif mode == 'csv' %}CSV generated — {{ report.rows }} rows ready to import into Yamtrack.
       {% elif push and push.dry_run %}Dry run — nothing was written.
       {% else %}Push complete — written to your Yamtrack instance.{% endif %}
     </p>
@@ -16,12 +17,22 @@
 
 <!-- stat cards -->
 <div class="stats">
+  {% if report.library %}
+  <div class="stat"><div class="num mono" style="color:var(--ok)">+{{ report.ingest.added }}</div><div class="lbl">New titles added</div></div>
+  <div class="stat"><div class="num mono">{{ report.ingest.merged }}</div><div class="lbl">Merged into existing</div></div>
+  <div class="stat"><div class="num mono">{{ report.ingest.total }}</div><div class="lbl">Library total</div></div>
+  {% if report.anime_rerouted %}
+  <div class="stat"><div class="num mono" style="color:#c9b6ff">{{ report.anime_rerouted }}</div><div class="lbl">Anime → MyAnimeList</div></div>
+  {% endif %}
+  <div class="stat"><div class="num mono">{{ report.rows }}</div><div class="lbl">Rows generated</div></div>
+  {% else %}
   <div class="stat"><div class="num mono">{{ report.shows_matched }}<span class="of">/{{ report.shows_total }}</span></div><div class="lbl">Shows matched</div></div>
   <div class="stat"><div class="num mono">{{ report.movies_matched }}<span class="of">/{{ report.movies_total }}</span></div><div class="lbl">Movies matched</div></div>
   {% if report.anime_rerouted %}
   <div class="stat"><div class="num mono" style="color:#c9b6ff">{{ report.anime_rerouted }}</div><div class="lbl">Anime → MyAnimeList</div></div>
   {% endif %}
   <div class="stat"><div class="num mono">{{ report.rows }}</div><div class="lbl">Rows generated</div></div>
+  {% endif %}
   {% if push %}
   <div class="stat"><div class="num mono" style="color:var(--ok)">{{ push.created }}</div><div class="lbl">Created</div></div>
   <div class="stat"><div class="num mono">{{ push.skipped }}</div><div class="lbl">Skipped (present)</div></div>
@@ -115,7 +126,10 @@
 </div>
 {% endif %}
 
-<a class="btn secondary" href="{{ url_for('index') }}">Run another</a>
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+  <a class="btn secondary" href="{{ url_for('index') }}">Run another</a>
+  {% if report.library %}<a class="btn secondary" href="{{ url_for('library_view') }}">View library</a>{% endif %}
+</div>
 
 <style>
   .result-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:22px}

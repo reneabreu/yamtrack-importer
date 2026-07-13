@@ -25,7 +25,8 @@ from flask import (
     url_for,
 )
 
-from yamtrack_importer.core.pipeline import run as run_pipeline
+from yamtrack_importer.core.library import Library
+from yamtrack_importer.core.pipeline import export_library, run_with_library
 from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, all_exporters, get_exporter
 from yamtrack_importer.mal import MALResolver
 from yamtrack_importer.resolve import TMDBResolver
@@ -227,18 +228,29 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
 
     providers = _build_providers(settings)
     options = {**options, "data_dir": config.DATA_DIR}
-    rows, report = run_pipeline(source, files, options, exporter, providers, progress=job.emit)
 
     if mode == "csv":
+        # Ingest this source into the persistent library (dedup/merge), then
+        # export the whole library so the file reflects every source combined.
+        library = Library(config.LIBRARY_PATH)
+        try:
+            rows, report = run_with_library(
+                library, source, files, options, exporter, providers, progress=job.emit
+            )
+        finally:
+            library.close()
         ext = exporter.info.output_ext
-        out_path = os.path.join(work_dir, f"{source.info.id}_{exporter.info.id}_import.{ext}")
+        out_path = os.path.join(work_dir, f"library_{exporter.info.id}_import.{ext}")
         exporter.write(rows, out_path)
         job.csv_path = out_path
-        job.download_name = f"{source.info.id}_{exporter.info.id}.{ext}"
+        job.download_name = f"library_{exporter.info.id}.{ext}"
         job.download_mime = exporter.info.output_mime
         job.summary = {"mode": "csv", "report": report, "download": True}
         job.emit(type="log", msg=f"Wrote {len(rows)} records. Ready to download.")
         return
+
+    from yamtrack_importer.core.pipeline import run as run_pipeline
+    rows, report = run_pipeline(source, files, options, exporter, providers, progress=job.emit)
 
     # push
     if "api" not in exporter.info.modes:
@@ -332,6 +344,65 @@ def history():
             "has_csv": bool(rec.get("csv")),
         })
     return render_template("history.html", records=records)
+
+
+@app.route("/library")
+def library_view():
+    """Show the merged local library — every source deduped into one collection."""
+    library = Library(config.LIBRARY_PATH)
+    try:
+        items = library.all_items()
+        counts = library.counts_by_type()
+        total = library.count()
+    finally:
+        library.close()
+    # Reuse the canonical exporter's per-title summary for the review table.
+    json_exp = get_exporter("json")
+    details = json_exp.details(json_exp.build(items))
+    # provenance chips per title (type+title -> sources)
+    prov = {(it.media_type.value, it.title): it.sources for it in items}
+    for d in details:
+        d["sources"] = prov.get((d["type"], d["title"]), [])
+    return render_template(
+        "library.html",
+        details=details, counts=counts, total=total,
+        exporters=[e.info for e in all_exporters()],
+    )
+
+
+@app.route("/library/export/<exporter_id>")
+def library_export(exporter_id):
+    try:
+        exporter = get_exporter(exporter_id)
+    except KeyError:
+        flash("Unknown destination.", "err")
+        return redirect(url_for("library_view"))
+    library = Library(config.LIBRARY_PATH)
+    try:
+        rows, _ = export_library(library, exporter)
+    finally:
+        library.close()
+    if not rows:
+        flash("Library is empty — run an import first.", "err")
+        return redirect(url_for("library_view"))
+    ext = exporter.info.output_ext
+    out_dir = tempfile.mkdtemp(prefix="yamlib_")
+    out_path = os.path.join(out_dir, f"library_{exporter.info.id}.{ext}")
+    exporter.write(rows, out_path)
+    return send_file(out_path, as_attachment=True,
+                     download_name=f"library_{exporter.info.id}.{ext}",
+                     mimetype=exporter.info.output_mime)
+
+
+@app.route("/library/clear", methods=["POST"])
+def library_clear():
+    library = Library(config.LIBRARY_PATH)
+    try:
+        n = library.clear()
+    finally:
+        library.close()
+    flash(f"Cleared the library ({n} title(s) removed).", "ok")
+    return redirect(url_for("library_view"))
 
 
 if __name__ == "__main__":

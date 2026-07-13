@@ -9,6 +9,7 @@ DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
 SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 CACHE_PATH = os.path.join(DATA_DIR, "tmdb_cache.json")
 OVERRIDES_PATH = os.path.join(DATA_DIR, "overrides.json")
+LIBRARY_PATH = os.path.join(DATA_DIR, "library.db")
 
 # Fields stored in settings.json (env vars provide defaults).
 _KEYS = {
