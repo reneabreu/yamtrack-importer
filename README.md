@@ -60,6 +60,20 @@ Images are published by GitHub Actions **only for version tags** `vX.Y.Z`
 (tagged `X.Y.Z`, `X.Y`, and `latest`) or a manual run — not on every push. See
 [Releasing](#releasing).
 
+### Make shortcuts
+
+A `Makefile` wraps the compose combinations (run `make` to list them):
+
+| Command | Does |
+|---------|------|
+| `make up` / `make update` | Run / update the published image |
+| `make build` | Build & run from local source |
+| `make dev` | Live-reload dev server |
+| `make dev-tailscale` | Live-reload dev server on your tailnet |
+| `make tailscale` | Published image as a tailnet node |
+| `make down` | Stop & remove everything (any mode) |
+| `make release VERSION=v1.0.0` | Tag & push a release |
+
 1. Go to **Settings** and paste your **TMDB API key** (free at
    [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)). For
    direct API import, also add your **Yamtrack URL + API key**.
