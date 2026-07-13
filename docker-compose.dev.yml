@@ -6,6 +6,10 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 #
+# To test your local code ON your Tailscale network, layer it over the tailscale
+# file instead (reachable at http://yamtrack-importer:8080 on the tailnet):
+#   docker compose -f docker-compose.tailscale.yml -f docker-compose.dev.yml up
+#
 # For a one-off production-style local build instead, use docker-compose.build.yml.
 # NOTE: debug mode is for local use only — never expose it publicly.
 services:

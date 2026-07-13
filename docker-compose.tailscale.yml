@@ -5,11 +5,13 @@
 #   1. Create a Tailscale auth key: https://login.tailscale.com/admin/settings/keys
 #      (a reusable + ephemeral key is convenient).
 #   2. Put it in .env as  TS_AUTHKEY=tskey-auth-xxxx
-#   3. docker compose -f docker-compose.tailscale.yml up -d --build
-#   4. Open http://localhost:8080, and in Settings use your Yamtrack Tailscale URL.
+#   3. Published image:  docker compose -f docker-compose.tailscale.yml up -d
+#      Or your local code with live reload (layer the dev override):
+#          docker compose -f docker-compose.tailscale.yml -f docker-compose.dev.yml up
+#   4. Reach it at http://localhost:8080 or, on the tailnet, http://yamtrack-importer:8080.
 #
-# The app container shares the tailscale container's network namespace, so the
-# UI is published on the tailscale service below.
+# The app shares the tailscale container's network namespace, so the UI is
+# published on the tailscale service below (not on the app service).
 
 services:
   tailscale:
@@ -35,7 +37,9 @@ services:
       - "8080:8080"                 # the app (shared namespace) reachable on your Mac
     restart: unless-stopped
 
-  app:
+  # Same service name as the base compose so overrides (e.g. docker-compose.dev.yml)
+  # layer cleanly on top of this file.
+  yamtrack-importer:
     image: ghcr.io/reneabreu/yamtrack-importer:${IMAGE_TAG:-latest}
     network_mode: service:tailscale  # join the tailscale node's network
     depends_on:

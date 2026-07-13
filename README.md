@@ -48,6 +48,14 @@ no rebuild (local use only):
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
+To test local code **on your Tailscale network** (e.g. to reach a tailnet-only
+Yamtrack, or open it from another device), layer the dev override over the
+Tailscale file instead — reachable at `http://yamtrack-importer:8080` on the tailnet:
+
+```bash
+docker compose -f docker-compose.tailscale.yml -f docker-compose.dev.yml up
+```
+
 Images are published by GitHub Actions **only for version tags** `vX.Y.Z`
 (tagged `X.Y.Z`, `X.Y`, and `latest`) or a manual run — not on every push. See
 [Releasing](#releasing).
