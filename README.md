@@ -16,10 +16,24 @@ Nintendo, RetroAchievements, Google Play Games, Komga, and Kavita.
 
 ## Run with Docker (web UI)
 
+Pulls the prebuilt multi-arch image from GitHub Container Registry — no local
+build needed:
+
 ```bash
-docker compose up -d --build
+docker compose up -d
 # open http://localhost:8080
 ```
+
+Update to the latest published build with `docker compose pull && docker compose up -d`.
+Pin a release by setting `IMAGE_TAG` (e.g. `IMAGE_TAG=v1.0.0`) in `.env`. To build
+from source instead, add the build override:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+The image is published automatically by GitHub Actions on every push to `main`
+(tagged `latest`) and on version tags `vX.Y.Z` (tagged `X.Y.Z` / `X.Y`).
 
 1. Go to **Settings** and paste your **TMDB API key** (free at
    [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)). For

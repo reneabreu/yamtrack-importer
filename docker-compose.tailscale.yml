@@ -36,8 +36,7 @@ services:
     restart: unless-stopped
 
   app:
-    build: .
-    image: yamtrack-migrate:latest
+    image: ghcr.io/reneabreu/yamtrack-time:${IMAGE_TAG:-latest}
     network_mode: service:tailscale  # join the tailscale node's network
     depends_on:
       - tailscale

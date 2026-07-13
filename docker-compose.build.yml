@@ -1,0 +1,5 @@
+# Override to build the image locally instead of pulling from ghcr.io.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+services:
+  yamtrack-migrate:
+    build: .
