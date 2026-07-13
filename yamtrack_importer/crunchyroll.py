@@ -53,7 +53,7 @@ class CrunchyrollClient:
                     "grant_type": "etp_rt_cookie",
                     "scope": "offline_access",
                     "device_id": self.device_id,
-                    "device_name": "yamtrack-migrate",
+                    "device_name": "yamtrack-importer",
                     "device_type": "com.crunchyroll.desktop",
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},

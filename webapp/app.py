@@ -25,15 +25,15 @@ from flask import (
     url_for,
 )
 
-from tvtime2yamtrack.api_client import YamtrackClient
-from tvtime2yamtrack.csv_writer import write_csv
-from tvtime2yamtrack.resolvers import get_resolver
-from tvtime2yamtrack.sources.registry import all_sources, get_source
+from yamtrack_importer.api_client import YamtrackClient
+from yamtrack_importer.csv_writer import write_csv
+from yamtrack_importer.resolvers import get_resolver
+from yamtrack_importer.sources.registry import all_sources, get_source
 
 from . import config, jobs
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "yamtrack-migrate-dev-key")
+app.secret_key = os.environ.get("SECRET_KEY", "yamtrack-importer-dev-key")
 app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "200")) * 1024 * 1024
 
 # Secrets kept only in process memory (never written to disk), cleared on restart.
@@ -181,7 +181,7 @@ def start():
         "include_anime_as_anime": bool(request.form.get("include_anime_as_anime")),
     }
 
-    work_dir = tempfile.mkdtemp(prefix="ymigrate_")
+    work_dir = tempfile.mkdtemp(prefix="yamimport_")
     try:
         files = _collect_inputs(source, work_dir)
     except (ValueError, zipfile.BadZipFile) as exc:

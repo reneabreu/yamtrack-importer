@@ -14,12 +14,12 @@
 services:
   tailscale:
     image: tailscale/tailscale:latest
-    container_name: yamtrack-migrate-ts
-    hostname: yamtrack-migrate
+    container_name: yamtrack-importer-ts
+    hostname: yamtrack-importer
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY:?Set TS_AUTHKEY in .env}
       - TS_STATE_DIR=/var/lib/tailscale
-      - TS_HOSTNAME=yamtrack-migrate
+      - TS_HOSTNAME=yamtrack-importer
       - TS_ACCEPT_DNS=true          # resolve *.ts.net MagicDNS names too
       # CRITICAL: kernel networking (not userspace), so the app sharing this
       # network namespace gets a real tailscale0 interface and can route to 100.x.
@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/reneabreu/yamtrack-time:${IMAGE_TAG:-latest}
+    image: ghcr.io/reneabreu/yamtrack-importer:${IMAGE_TAG:-latest}
     network_mode: service:tailscale  # join the tailscale node's network
     depends_on:
       - tailscale

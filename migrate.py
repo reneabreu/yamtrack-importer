@@ -23,10 +23,10 @@ import logging
 import os
 import sys
 
-from tvtime2yamtrack.api_client import YamtrackClient
-from tvtime2yamtrack.csv_writer import write_csv
-from tvtime2yamtrack.pipeline import load_and_resolve
-from tvtime2yamtrack.resolve import TMDBResolver
+from yamtrack_importer.api_client import YamtrackClient
+from yamtrack_importer.csv_writer import write_csv
+from yamtrack_importer.pipeline import load_and_resolve
+from yamtrack_importer.resolve import TMDBResolver
 
 
 def _load_dotenv(path: str = ".env") -> None:

@@ -1,4 +1,4 @@
-# Yamtrack Migrate
+# Yamtrack Importer
 
 Migrate your media history from other services into
 [Yamtrack](https://github.com/FuzzyGrim/Yamtrack). Runs as a **Docker web app**
@@ -231,7 +231,7 @@ Notes and caveats:
   `noaihdevm_6iyg0a8l0q`, `etp_rt_cookie` grant, `/content/v2/{account}/watch-history`).
   Crunchyroll's API is private, so if auth starts failing, grab a fresh `etp_rt`
   (it expires with your browser session); the client id and endpoints live at the
-  top of `tvtime2yamtrack/crunchyroll.py` if Crunchyroll ever rotates them.
+  top of `yamtrack_importer/crunchyroll.py` if Crunchyroll ever rotates them.
 - Titles are matched to MAL by name (Crunchyroll doesn't expose MAL ids).
   Unmatched series appear on the result page with a MAL search link and an
   `overrides.json` scaffold (`anime:<title>` → `{"mal_id": …}`).
@@ -241,7 +241,7 @@ Notes and caveats:
 ## Adding a new source
 
 The app is organized around a source-plugin layer in
-`tvtime2yamtrack/sources/`. To add one:
+`yamtrack_importer/sources/`. To add one:
 
 1. Subclass `Source` (see `sources/tvtime.py`), declaring its `SourceInfo`
    (id, label, inputs, and the Yamtrack metadata provider it resolves against —

@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY tvtime2yamtrack ./tvtime2yamtrack
+COPY yamtrack_importer ./yamtrack_importer
 COPY webapp ./webapp
 COPY migrate.py ./
 
