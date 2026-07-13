@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Configurable storage roots**: `CONFIG_DIR` (settings/overrides), `DATA_DIR`
+  (library.db + history), and `MEDIA_DIR` (TMDB/MAL/Crunchyroll lookup cache),
+  each overridable by env var and independently mountable. All default to
+  `DATA_DIR`, so existing single-volume setups are unchanged. Groundwork for
+  separating the regenerable media cache from the tracker data you back up.
 - **Delta ("changes only") exports**: each destination snapshots the library on
   export, so a follow-up export can include only titles added or changed since —
   new episodes, rewatches, status/score. Web adds a "Changes only" button (with a

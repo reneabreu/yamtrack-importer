@@ -51,6 +51,10 @@ services:
       # You can also set these on the Settings page.
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - MAL_CLIENT_ID=${MAL_CLIENT_ID:-}
+      # Storage roots (all default to /data if unset).
+      - CONFIG_DIR=${CONFIG_DIR:-}
+      - DATA_DIR=${DATA_DIR:-/data}
+      - MEDIA_DIR=${MEDIA_DIR:-}
       - SECRET_KEY=${SECRET_KEY:-change-me}
       - MAX_UPLOAD_MB=200
     restart: unless-stopped

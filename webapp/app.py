@@ -43,9 +43,8 @@ def _build_providers(settings: dict) -> dict:
         providers["tmdb"] = TMDBResolver(
             api_key=tmdb_key, cache_path=config.CACHE_PATH, overrides_path=config.OVERRIDES_PATH
         )
-    mal_cache = os.path.join(os.path.dirname(config.CACHE_PATH) or ".", "mal_cache.json")
     providers["mal"] = MALResolver(
-        cache_path=mal_cache, overrides_path=config.OVERRIDES_PATH,
+        cache_path=config.MAL_CACHE_PATH, overrides_path=config.OVERRIDES_PATH,
         client_id=settings.get("mal_client_id", ""),
     )
     return providers
@@ -234,7 +233,7 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
         raise RuntimeError("A TMDB API key is required. Set it on the Settings page.")
 
     providers = _build_providers(settings)
-    options = {**options, "data_dir": config.DATA_DIR}
+    options = {**options, "data_dir": config.DATA_DIR, "media_dir": config.MEDIA_DIR}
 
     if mode == "csv":
         # Ingest this source into the persistent library (dedup/merge), then

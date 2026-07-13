@@ -63,18 +63,30 @@ Still possible later:
 The library is already a canonical, deduplicated store of watch history — the
 hard part of a tracker. The natural next step is to make it usable *on its own*,
 so exporting to Yamtrack (or anything else) becomes optional rather than the
-point:
+point. The intended shape is three tiers:
 
-- **Read/write library UI** — edit, add, and remove entries directly (statuses,
-  scores, progress, mark episodes watched), not just import + export.
-- **Views** — currently-watching, up-next, planning, per-type dashboards, and
-  history/stats over the library.
-- **Yamtrack becomes one exporter among many** — keep the import/export seams so
-  you can still sync out, but nothing depends on Yamtrack being present.
-- **Prerequisites** deferred until it's a hosted tracker rather than a local
-  tool: app **login** (Basic Auth via env) and optional **at-rest encryption**
-  of `library.db` (SQLCipher). Skipped for now — behind Tailscale + filesystem
-  permissions the local file is sufficient.
+1. **Exporter (public)** — the import → convert/export flow works without an
+   account. Anything it produces is held in the session only; nothing personal
+   is persisted unless the user is logged in.
+2. **Tracker (logged-in)** — the persistent library and its read/write UI live
+   behind login: edit/add/remove entries (statuses, scores, progress, mark
+   episodes watched), plus views (currently-watching, up-next, planning,
+   per-type dashboards) and history/stats. Yamtrack becomes just one exporter.
+3. **General media data (shared cache)** — resolved title metadata (ids, episode
+   counts, titles) is cached locally and reused, so lookups only hit
+   TMDB/MAL/Jikan when an entry isn't cached, or when a title is ambiguous and
+   needs the user to pick. Editing an existing entry never triggers a re-import
+   or re-search. Today this is the per-resolver cache under `MEDIA_DIR`; the
+   long-term version is a shared media table the tracker reads/writes directly.
+
+Storage already separates along these lines: `CONFIG_DIR` (settings/overrides),
+`DATA_DIR` (the tracker store — `library.db` + history), and `MEDIA_DIR` (the
+regenerable media cache), each independently mountable.
+
+Prerequisites deferred until it's a hosted tracker rather than a local tool: app
+**login** (Basic Auth via env) and optional **at-rest encryption** of
+`library.db` (SQLCipher). Skipped for now — behind Tailscale + filesystem
+permissions the local file is sufficient.
 
 This is exploratory: the modular core is deliberately destination-agnostic so
 this can grow incrementally without a rewrite.

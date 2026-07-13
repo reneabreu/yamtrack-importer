@@ -55,8 +55,10 @@ class CrunchyrollSource(Source):
     )
 
     def _history_cache_path(self, options) -> str:
-        data_dir = options.get("data_dir") or os.environ.get("DATA_DIR") or "."
-        return os.path.join(data_dir, "crunchyroll_history.json")
+        # The fetched history is a media-metadata cache, so prefer the media dir.
+        cache_dir = (options.get("media_dir") or os.environ.get("MEDIA_DIR")
+                     or options.get("data_dir") or os.environ.get("DATA_DIR") or ".")
+        return os.path.join(cache_dir, "crunchyroll_history.json")
 
     def fetch(self, inputs, options, progress=None):
         emit = progress or (lambda **_k: None)

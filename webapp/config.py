@@ -30,10 +30,26 @@ def load_dotenv(path: str = ".env") -> None:
 
 load_dotenv()
 
-DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.getcwd(), "data"))
-SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
-CACHE_PATH = os.path.join(DATA_DIR, "tmdb_cache.json")
-OVERRIDES_PATH = os.path.join(DATA_DIR, "overrides.json")
+
+def _dir(name: str, default: str) -> str:
+    """An env-overridable directory. An empty value counts as unset (so passing
+    ``CONFIG_DIR=`` in compose falls back to the default rather than to "")."""
+    return (os.environ.get(name) or "").strip() or default
+
+
+# Storage roots. Everything defaults under DATA_DIR so a single mounted volume
+# keeps working; set CONFIG_DIR / MEDIA_DIR to split them onto separate volumes.
+#   DATA_DIR   — the tracker store: library.db + run history (your data)
+#   CONFIG_DIR — app configuration: settings.json, overrides.json
+#   MEDIA_DIR  — general media-metadata cache: TMDB/MAL/Crunchyroll lookups
+DATA_DIR = _dir("DATA_DIR", os.path.join(os.getcwd(), "data"))
+CONFIG_DIR = _dir("CONFIG_DIR", DATA_DIR)
+MEDIA_DIR = _dir("MEDIA_DIR", DATA_DIR)
+
+SETTINGS_PATH = os.path.join(CONFIG_DIR, "settings.json")
+OVERRIDES_PATH = os.path.join(CONFIG_DIR, "overrides.json")
+CACHE_PATH = os.path.join(MEDIA_DIR, "tmdb_cache.json")
+MAL_CACHE_PATH = os.path.join(MEDIA_DIR, "mal_cache.json")
 LIBRARY_PATH = os.path.join(DATA_DIR, "library.db")
 
 # Fields stored in settings.json (env vars provide defaults).
@@ -43,8 +59,13 @@ _KEYS = {
 }
 
 
-def ensure_data_dir() -> None:
-    os.makedirs(DATA_DIR, exist_ok=True)
+def ensure_dirs() -> None:
+    for d in (DATA_DIR, CONFIG_DIR, MEDIA_DIR):
+        os.makedirs(d, exist_ok=True)
+
+
+# Backwards-compatible alias.
+ensure_data_dir = ensure_dirs
 
 
 def load_settings() -> dict:

@@ -10,10 +10,19 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/data
+      # To split storage onto separate volumes, set CONFIG_DIR/MEDIA_DIR in .env
+      # and mount them too, e.g.:
+      #   - ./config:/config
+      #   - ./media:/media
     environment:
       # Optional defaults; you can also set these on the Settings page.
       - TMDB_API_KEY=${TMDB_API_KEY:-}
       - MAL_CLIENT_ID=${MAL_CLIENT_ID:-}
+      # Storage roots (all default to /data if unset). config = settings/overrides,
+      # data = library.db + history, media = TMDB/MAL/Crunchyroll lookup cache.
+      - CONFIG_DIR=${CONFIG_DIR:-}
+      - DATA_DIR=${DATA_DIR:-/data}
+      - MEDIA_DIR=${MEDIA_DIR:-}
       # Change in production.
       - SECRET_KEY=${SECRET_KEY:-change-me}
       - MAX_UPLOAD_MB=200

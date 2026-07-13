@@ -121,6 +121,22 @@ Keys, the TMDB match cache, `overrides.json`, and the library (`library.db`) liv
 in the `./data` volume, so they persist across restarts. You can also seed the
 key via the `TMDB_API_KEY` env var in `docker-compose.yml`.
 
+### Storage layout
+
+Data is grouped into three roots, each overridable by an env var. They all
+default to `DATA_DIR` (`/data` in Docker), so one mounted volume works out of the
+box — set them only if you want to split storage onto separate volumes:
+
+| Env var | Holds | Notes |
+|---------|-------|-------|
+| `CONFIG_DIR` | `settings.json`, `overrides.json` | your keys and manual id fixes |
+| `DATA_DIR` | `library.db`, run `history/` | your tracker data — back this up |
+| `MEDIA_DIR` | `tmdb_cache.json`, `mal_cache.json`, `crunchyroll_history.json` | media-metadata cache; regenerable, safe to wipe |
+
+Splitting them lets you, for example, keep the regenerable media cache on scratch
+storage while backing up only `DATA_DIR`. If you set them in `.env`, mount each
+directory in `docker-compose.yml` too.
+
 ## Run without Docker (web UI)
 
 ```bash
