@@ -40,6 +40,14 @@ from source instead, add the build override:
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
+For active development, use the **live-reload** override — it mounts your working
+tree and runs the Flask dev server, so template/code edits show on refresh with
+no rebuild (local use only):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
 Images are published by GitHub Actions **only for version tags** `vX.Y.Z`
 (tagged `X.Y.Z`, `X.Y`, and `latest`) or a manual run — not on every push. See
 [Releasing](#releasing).

@@ -21,6 +21,17 @@ pip install -r requirements.txt
 python -m webapp.app        # web UI at http://localhost:8080
 ```
 
+Prefer Docker? Use the live-reload override — it mounts your working tree and
+auto-reloads on edits (no rebuild):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+Note: the default `docker compose up` pulls the **published** image from ghcr,
+which won't include your uncommitted changes — use the dev (or build) override
+above to run local code.
+
 Run the same checks CI runs before pushing:
 
 ```bash

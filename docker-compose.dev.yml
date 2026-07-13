@@ -1,0 +1,20 @@
+# Development override: run YOUR local source with live reload.
+#
+# Uses the published image only for its dependencies, then bind-mounts your
+# working tree over it and runs the Flask dev server (debug + auto-reload).
+# Edit templates/code and just refresh the page — no rebuild needed.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# For a one-off production-style local build instead, use docker-compose.build.yml.
+# NOTE: debug mode is for local use only — never expose it publicly.
+services:
+  yamtrack-importer:
+    build: .                      # fall back to building if the image isn't present
+    command: ["python", "-m", "webapp.app"]
+    environment:
+      - PORT=8080
+    volumes:
+      - ./webapp:/app/webapp
+      - ./yamtrack_importer:/app/yamtrack_importer
+      - ./migrate.py:/app/migrate.py
