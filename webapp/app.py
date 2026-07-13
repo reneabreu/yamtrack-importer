@@ -26,12 +26,26 @@ from flask import (
 )
 
 from yamtrack_importer.api_client import YamtrackClient
-from yamtrack_importer.build_records import summarize_rows
-from yamtrack_importer.csv_writer import write_csv
-from yamtrack_importer.resolvers import get_resolver
+from yamtrack_importer.core.pipeline import run as run_pipeline
+from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, get_exporter
+from yamtrack_importer.mal import MALResolver
+from yamtrack_importer.resolve import TMDBResolver
 from yamtrack_importer.sources.registry import all_sources, get_source
 
 from . import config, jobs
+
+
+def _build_providers(settings: dict) -> dict:
+    """Provider clients the resolution layer uses. MAL (Jikan) needs no key."""
+    providers: dict = {}
+    tmdb_key = settings.get("tmdb_key", "")
+    if tmdb_key:
+        providers["tmdb"] = TMDBResolver(
+            api_key=tmdb_key, cache_path=config.CACHE_PATH, overrides_path=config.OVERRIDES_PATH
+        )
+    mal_cache = os.path.join(os.path.dirname(config.CACHE_PATH) or ".", "mal_cache.json")
+    providers["mal"] = MALResolver(cache_path=mal_cache, overrides_path=config.OVERRIDES_PATH)
+    return providers
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "yamtrack-importer-dev-key")
@@ -219,70 +233,38 @@ def start():
 def _run_migration(job, source, files, settings, options, mode, dry_run, work_dir):
     job.source_label = source.info.label
     job.mode = mode
-    resolver = get_resolver(
-        source.info.metadata_provider, settings, config.CACHE_PATH, config.OVERRIDES_PATH
-    )
-    rows, report = source.build(files, resolver, options, progress=job.emit)
-    report["details"] = summarize_rows(rows)  # per-title review data
+    exporter = get_exporter(DEFAULT_EXPORTER)
+
+    # TMDB is only needed if the source produces TV/movies.
+    needs_tmdb = any(t in ("tv", "movie") for t in source.info.media_types)
+    if needs_tmdb and not settings.get("tmdb_key"):
+        raise RuntimeError("A TMDB API key is required. Set it on the Settings page.")
+
+    providers = _build_providers(settings)
+    options = {**options, "data_dir": config.DATA_DIR}
+    rows, report = run_pipeline(source, files, options, exporter, providers, progress=job.emit)
 
     if mode == "csv":
-        out_path = os.path.join(work_dir, f"{source.info.id}_yamtrack_import.csv")
-        write_csv(rows, out_path)
+        out_path = os.path.join(work_dir, f"{source.info.id}_{exporter.info.id}_import.csv")
+        exporter.write_csv(rows, out_path)
         job.csv_path = out_path
         job.summary = {"mode": "csv", "report": report, "download": True}
         job.emit(type="log", msg=f"Wrote {len(rows)} rows to CSV. Ready to download.")
         return
 
     # push
-    client = YamtrackClient(
-        base_url=settings.get("yamtrack_url", ""),
-        api_key=settings.get("yamtrack_key", ""),
-        dry_run=dry_run,
-    )
     if not dry_run:
-        ok, detail = client.check_connection()
+        ok, detail = exporter.check_connection(settings)
         if not ok:
             raise RuntimeError(
-                f"Could not connect to Yamtrack: {detail}. "
-                "If Yamtrack is on Tailscale, this container isn't on your tailnet — "
+                f"Could not connect to {exporter.info.label}: {detail}. "
+                "If it's on Tailscale, this container isn't on your tailnet — "
                 "see the Tailscale section of the README."
             )
-
     job.emit(type="log", msg=("Dry run — resolving only, nothing will be written."
-                              if dry_run else "Pushing to Yamtrack…"))
-    total = len(rows)
-    job.emit(type="progress", phase="push", current=0, total=total)
-    created = skipped = failed = 0
-    failures: list[str] = []
-    for i, row in enumerate(rows, 1):
-        mt, src, mid = row["media_type"], row.get("source", "tmdb"), str(row["media_id"])
-        if not dry_run and mt in ("tv", "movie") and client.exists(mt, src, mid):
-            skipped += 1
-        else:
-            ok, msg = client.create(row)
-            if ok:
-                created += 1
-            else:
-                failed += 1
-                if len(failures) < 100:
-                    failures.append(f"{mt} {mid}: {msg}")
-                    job.emit(type="log", msg=f"  ✗ {mt} {mid}: {msg}")
-        if i % 25 == 0 or i == total:
-            job.emit(type="progress", phase="push", current=i, total=total)
-
-    job.summary = {
-        "mode": "push",
-        "report": report,
-        "download": False,
-        "push": {
-            "created": created,
-            "skipped": skipped,
-            "failed": failed,
-            "dry_run": dry_run,
-            "failures": failures,
-        },
-    }
-    job.emit(type="log", msg=f"Done. created={created} skipped={skipped} failed={failed}")
+                              if dry_run else f"Pushing to {exporter.info.label}…"))
+    push_stats = exporter.push(rows, settings, dry_run=dry_run, progress=job.emit)
+    job.summary = {"mode": "push", "report": report, "download": False, "push": push_stats}
 
 
 @app.route("/progress/<job_id>")

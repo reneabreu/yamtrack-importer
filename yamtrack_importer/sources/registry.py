@@ -6,28 +6,27 @@ from .base import PlannedSource, Source, SourceInfo
 from .crunchyroll import CrunchyrollSource
 from .tvtime import TVTimeSource
 
-# Planned sources. Each notes the Yamtrack metadata provider it will resolve
-# against, which determines the resolver/matching strategy still to be built.
+# Planned sources (canonical media types they'll emit).
 _PLANNED = [
-    SourceInfo("netflix", "Netflix", "planned", ["tv", "movie"], "tmdb",
+    SourceInfo("netflix", "Netflix", "planned", ["tv", "movie"],
                note="Viewing history CSV; title-only, matched by name + year."),
-    SourceInfo("globoplay", "Globo Play", "planned", ["tv", "movie"], "tmdb",
-               note="BR catalog; title-based TMDB matching."),
-    SourceInfo("xbox", "Xbox", "planned", ["game"], "igdb",
-               note="Achievements/played games -> IGDB ids."),
-    SourceInfo("nintendo", "Nintendo", "planned", ["game"], "igdb",
-               note="Play activity -> IGDB ids."),
-    SourceInfo("hbomax", "HBO Max", "planned", ["tv", "movie"], "tmdb",
-               note="Viewing history; title-based TMDB matching."),
-    SourceInfo("retroachievements", "RetroAchievements", "planned", ["game"], "igdb",
-               note="Played games + completion -> IGDB ids."),
-    SourceInfo("googleplaygames", "Google Play Games", "planned", ["game"], "igdb",
-               note="Play history -> IGDB ids."),
-    SourceInfo("appletv", "Apple TV", "planned", ["tv", "movie"], "tmdb",
-               note="Viewing history; title-based TMDB matching."),
-    SourceInfo("komga", "Komga", "planned", ["manga", "comic", "book"], "mangaupdates",
+    SourceInfo("globoplay", "Globo Play", "planned", ["tv", "movie"],
+               note="BR catalog; title-based matching."),
+    SourceInfo("xbox", "Xbox", "planned", ["game"],
+               note="Achievements/played games."),
+    SourceInfo("nintendo", "Nintendo", "planned", ["game"],
+               note="Play activity."),
+    SourceInfo("hbomax", "HBO Max", "planned", ["tv", "movie"],
+               note="Viewing history; title-based matching."),
+    SourceInfo("retroachievements", "RetroAchievements", "planned", ["game"],
+               note="Played games + completion."),
+    SourceInfo("googleplaygames", "Google Play Games", "planned", ["game"],
+               note="Play history."),
+    SourceInfo("appletv", "Apple TV", "planned", ["tv", "movie"],
+               note="Viewing history; title-based matching."),
+    SourceInfo("komga", "Komga", "planned", ["manga", "book"],
                note="Read progress via Komga API/export."),
-    SourceInfo("kavita", "Kavita", "planned", ["manga", "comic", "book"], "mangaupdates",
+    SourceInfo("kavita", "Kavita", "planned", ["manga", "book"],
                note="Read progress via Kavita API/export."),
 ]
 

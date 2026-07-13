@@ -66,25 +66,30 @@ class MALResolver:
             time.sleep(1.0)
         return None
 
-    def resolve_anime(self, anime) -> None:
-        override = self.overrides.get(f"anime:{anime.title.lower()}")
-        cache_key = f"anime:{anime.title.lower()}"
+    def resolve_anime_by_title(self, title: str) -> dict | None:
+        """Resolve an anime title to MAL data. Returns {mal_id, title, episodes,
+        note} (episodes filled even for bare-id overrides) or a miss dict."""
+        override = self.overrides.get(f"anime:{title.lower()}")
+        cache_key = f"anime:{title.lower()}"
         data = override or self.cache.get(cache_key)
         if not (data and data.get("mal_id")):
             if override:
                 data = override
             else:
-                data = self._lookup(anime.title)
+                data = self._lookup(title)
                 if data and data.get("mal_id"):
                     self.cache[cache_key] = data
                 else:
                     self.cache.pop(cache_key, None)
+        if data and data.get("mal_id") and "episodes" not in data:
+            data = {**data, **self._by_id(int(data["mal_id"]))}
+        return data
+
+    def resolve_anime(self, anime) -> None:
+        data = self.resolve_anime_by_title(anime.title)
         if not data or not data.get("mal_id"):
             anime.resolve_note = "not found"
             return
-        # A manual override may only carry an id — fetch the episode total.
-        if "episodes" not in data:
-            data = {**data, **self._by_id(int(data["mal_id"]))}
         anime.mal_id = int(data["mal_id"])
         anime.mal_title = data.get("title") or anime.title
         anime.total_episodes = data.get("episodes")

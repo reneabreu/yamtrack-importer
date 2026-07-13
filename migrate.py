@@ -23,10 +23,11 @@ import logging
 import os
 import sys
 
-from yamtrack_importer.api_client import YamtrackClient
-from yamtrack_importer.csv_writer import write_csv
-from yamtrack_importer.pipeline import load_and_resolve
+from yamtrack_importer.core.pipeline import run as run_pipeline
+from yamtrack_importer.exporters.registry import get_exporter
+from yamtrack_importer.mal import MALResolver
 from yamtrack_importer.resolve import TMDBResolver
+from yamtrack_importer.sources.tvtime import TVTimeSource
 
 
 def _load_dotenv(path: str = ".env") -> None:
@@ -59,17 +60,23 @@ def _add_common(p: argparse.ArgumentParser) -> None:
 
 
 def _run_pipeline(args):
-    resolver = TMDBResolver(
-        api_key=args.tmdb_key, cache_path=args.cache, overrides_path=args.overrides
-    )
-    rows, report = load_and_resolve(
-        args.export,
-        resolver,
-        include_shows=not args.no_shows,
-        include_movies=not args.no_movies,
-        include_watchlist=not args.no_watchlist,
-        include_ratings=not args.no_ratings,
-        include_anime_as_anime=not args.no_anime,
+    import os as _os
+    providers = {
+        "tmdb": TMDBResolver(api_key=args.tmdb_key, cache_path=args.cache,
+                             overrides_path=args.overrides),
+        "mal": MALResolver(
+            cache_path=_os.path.join(_os.path.dirname(args.cache) or ".", "mal_cache.json"),
+            overrides_path=args.overrides),
+    }
+    options = {
+        "include_shows": not args.no_shows,
+        "include_movies": not args.no_movies,
+        "include_watchlist": not args.no_watchlist,
+        "include_ratings": not args.no_ratings,
+        "include_anime_as_anime": not args.no_anime,
+    }
+    rows, report = run_pipeline(
+        TVTimeSource(), {"export": args.export}, options, get_exporter("yamtrack"), providers
     )
     with open(args.report, "w", encoding="utf-8") as fh:
         json.dump(report, fh, ensure_ascii=False, indent=2)
@@ -95,46 +102,29 @@ def _print_report(report: dict, report_path: str) -> None:
 
 def cmd_convert(args):
     rows, _ = _run_pipeline(args)
-    n = write_csv(rows, args.out)
+    n = get_exporter("yamtrack").write_csv(rows, args.out)
     print(f"Wrote {n} rows -> {args.out}")
     print("Upload it in Yamtrack: Settings -> Import -> Yamtrack CSV.")
 
 
 def cmd_push(args):
-    client = YamtrackClient(
-        base_url=args.yamtrack_url or os.environ.get("YAMTRACK_URL", ""),
-        api_key=args.yamtrack_key or os.environ.get("YAMTRACK_API_KEY", ""),
-        dry_run=args.dry_run,
-    )
+    exporter = get_exporter("yamtrack")
+    settings = {
+        "yamtrack_url": args.yamtrack_url or os.environ.get("YAMTRACK_URL", ""),
+        "yamtrack_key": args.yamtrack_key or os.environ.get("YAMTRACK_API_KEY", ""),
+    }
     if not args.dry_run:
-        ok, detail = client.check_connection()
+        ok, detail = exporter.check_connection(settings)
         if not ok:
             sys.exit(f"Could not connect to Yamtrack: {detail}")
 
     rows, _ = _run_pipeline(args)
-
-    created = skipped = failed = 0
-    failures = []
-    for i, row in enumerate(rows, 1):
-        mt, src, mid = row["media_type"], row.get("source", "tmdb"), str(row["media_id"])
-        # Episodes/seasons are created together with their parent; still try each.
-        if not args.dry_run and not args.no_skip_existing and mt in ("tv", "movie"):
-            if client.exists(mt, src, mid):
-                skipped += 1
-                continue
-        ok, msg = client.create(row)
-        if ok:
-            created += 1
-        else:
-            failed += 1
-            failures.append(f"{mt} {mid}: {msg}")
-        if i % 100 == 0:
-            print(f"  ...{i}/{len(rows)} (created {created}, skipped {skipped}, failed {failed})")
-
-    print(f"\nDone. created={created} skipped={skipped} failed={failed}")
-    if failures:
+    stats = exporter.push(rows, settings, dry_run=args.dry_run)
+    print(f"\nDone. created={stats['created']} skipped={stats['skipped']} "
+          f"failed={stats['failed']}")
+    if stats["failures"]:
         with open("push_failures.log", "w", encoding="utf-8") as fh:
-            fh.write("\n".join(failures))
+            fh.write("\n".join(stats["failures"]))
         print(f"  Wrote {len(failures)} failures -> push_failures.log")
 
 

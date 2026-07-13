@@ -113,24 +113,30 @@ class TMDBResolver:
             self.cache.pop(cache_key, None)        # drop any stale cached miss
         return data
 
-    # ---- shows -------------------------------------------------------
-    def resolve_show(self, show: ShowRecord) -> None:
-        override = self.overrides.get(f"tv:{show.tvdb_id}") or self.overrides.get(
-            f"tvname:{show.name.lower()}"
+    # ---- shows (primitive) -------------------------------------------
+    def resolve_tv(self, tvdb_id, name: str) -> dict | None:
+        """Resolve a TV title to TMDB data by TheTVDB id (or title). Returns the
+        enriched dict {tmdb_id, title, total_episodes, season_episode_counts,
+        is_anime, note} or a miss dict."""
+        override = self.overrides.get(f"tv:{tvdb_id}") or self.overrides.get(
+            f"tvname:{name.lower()}"
         )
-        cache_key = f"tv:{show.tvdb_id or show.name.lower()}"
+        cache_key = f"tv:{tvdb_id or name.lower()}"
         data = self._resolve(
-            cache_key, override, lambda: self._lookup_show(show),
+            cache_key, override, lambda: self._lookup_tv(tvdb_id, name),
             needs_refresh=lambda d: "is_anime" not in d,  # enrich pre-anime cache
         )
         # A manual override may only carry an id — enrich it with real TMDB data.
         if data and data.get("tmdb_id") and "season_episode_counts" not in data:
-            enriched = self._tv_details(int(data["tmdb_id"]), data.get("title") or show.name,
+            enriched = self._tv_details(int(data["tmdb_id"]), data.get("title") or name,
                                         "manual override")
             if data.get("title"):
                 enriched["title"] = data["title"]
             data = enriched
+        return data
 
+    def resolve_show(self, show: ShowRecord) -> None:
+        data = self.resolve_tv(show.tvdb_id, show.name)
         if not data or not data.get("tmdb_id"):
             show.resolve_note = (data or {}).get("note", "not found")
             return
@@ -143,26 +149,25 @@ class TMDBResolver:
         }
         show.resolve_note = data.get("note", "")
 
-    def _lookup_show(self, show: ShowRecord) -> dict | None:
+    def _lookup_tv(self, tvdb_id, name: str) -> dict | None:
         tmdb_id = None
         note = ""
-        if show.tvdb_id:
-            found = self._get(f"/find/{show.tvdb_id}", {"external_source": "tvdb_id"})
+        if tvdb_id:
+            found = self._get(f"/find/{tvdb_id}", {"external_source": "tvdb_id"})
             results = (found or {}).get("tv_results") or []
             if results:
                 tmdb_id = results[0]["id"]
                 note = "matched by tvdb_id"
         if tmdb_id is None:
-            # Fall back to a title search.
-            search = self._get("/search/tv", {"query": show.name})
+            search = self._get("/search/tv", {"query": name})
             results = (search or {}).get("results") or []
-            best = _best_title_match(show.name, results, "name", "original_name")
+            best = _best_title_match(name, results, "name", "original_name")
             if best:
                 tmdb_id = best["id"]
                 note = "matched by title search"
         if tmdb_id is None:
             return {"tmdb_id": None, "note": "not found"}
-        return self._tv_details(tmdb_id, show.name, note)
+        return self._tv_details(tmdb_id, name, note)
 
     def _tv_details(self, tmdb_id: int, fallback_title: str, note: str) -> dict:
         """Fetch a TMDB show's season structure + anime flag by id."""
@@ -185,12 +190,16 @@ class TMDBResolver:
             "note": note,
         }
 
-    # ---- movies ------------------------------------------------------
-    def resolve_movie(self, movie: MovieRecord) -> None:
-        override = self.overrides.get(f"movie:{movie.name.lower()}|{movie.year or ''}")
-        cache_key = f"movie:{movie.name.lower()}|{movie.year or ''}"
-        data = self._resolve(cache_key, override, lambda: self._lookup_movie(movie))
+    # ---- movies (primitive) ------------------------------------------
+    def resolve_movie_by_title(self, title: str, year) -> dict | None:
+        """Resolve a movie to TMDB data by title (+ year). Returns
+        {tmdb_id, title, note} or a miss dict."""
+        override = self.overrides.get(f"movie:{title.lower()}|{year or ''}")
+        cache_key = f"movie:{title.lower()}|{year or ''}"
+        return self._resolve(cache_key, override, lambda: self._lookup_movie_by(title, year))
 
+    def resolve_movie(self, movie: MovieRecord) -> None:
+        data = self.resolve_movie_by_title(movie.name, movie.year)
         if not data or not data.get("tmdb_id"):
             movie.resolve_note = (data or {}).get("note", "not found")
             return
@@ -198,24 +207,21 @@ class TMDBResolver:
         movie.tmdb_title = data.get("title")
         movie.resolve_note = data.get("note", "")
 
-    def _lookup_movie(self, movie: MovieRecord) -> dict | None:
-        params = {"query": movie.name}
-        if movie.year:
-            params["year"] = movie.year
+    def _lookup_movie_by(self, title: str, year) -> dict | None:
+        params = {"query": title}
+        if year:
+            params["year"] = year
         search = self._get("/search/movie", params)
         results = (search or {}).get("results") or []
-        if not results and movie.year:
-            # Retry without the year constraint.
-            search = self._get("/search/movie", {"query": movie.name})
+        if not results and year:
+            search = self._get("/search/movie", {"query": title})
             results = (search or {}).get("results") or []
-        best = _best_title_match(
-            movie.name, results, "title", "original_title", year=movie.year
-        )
+        best = _best_title_match(title, results, "title", "original_title", year=year)
         if not best:
             return {"tmdb_id": None, "note": "not found"}
         return {
             "tmdb_id": best["id"],
-            "title": best.get("title") or movie.name,
+            "title": best.get("title") or title,
             "note": "matched by title search",
         }
 
