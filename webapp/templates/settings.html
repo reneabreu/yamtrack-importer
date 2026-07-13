@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Settings</h1>
+<p class="sub">Keys are stored in the app's data volume. Leave a field blank to keep the current value.</p>
+
+<form method="post" action="{{ url_for('settings_view') }}">
+  <div class="card">
+    <label>TMDB API key <span class="hint">(v3 key or v4 read token — required for TV/movies)</span></label>
+    <input type="password" name="tmdb_key"
+           placeholder="{{ masked(tmdb_key) or 'Get a free key at themoviedb.org/settings/api' }}">
+  </div>
+
+  <div class="card">
+    <label>Yamtrack URL <span class="hint">(only for direct API push)</span></label>
+    <input type="url" name="yamtrack_url" value="{{ yamtrack_url }}"
+           placeholder="https://yamtrack.example.com">
+
+    <label style="margin-top:16px">Yamtrack API key
+      <span class="hint">(Yamtrack → Settings → Integrations)</span></label>
+    <input type="password" name="yamtrack_key"
+           placeholder="{{ masked(yamtrack_key) or 'X-api-key value' }}">
+
+    <div style="margin-top:14px">
+      <button type="button" class="secondary" id="test-btn">Test Yamtrack connection</button>
+      <span id="test-result" class="hint" style="margin-left:10px"></span>
+    </div>
+    <span class="hint">Tests the saved values — save first if you just changed them.</span>
+  </div>
+
+  <button type="submit">Save settings</button>
+  <a class="btn secondary" href="{{ url_for('index') }}" style="margin-left:8px">Back</a>
+</form>
+
+<script>
+  document.getElementById('test-btn').addEventListener('click', async function () {
+    const out = document.getElementById('test-result');
+    out.textContent = 'Testing…'; out.style.color = 'var(--mut)';
+    try {
+      const r = await fetch('{{ url_for("test_connection") }}', { method: 'POST' });
+      const d = await r.json();
+      out.textContent = d.ok ? '✓ Connected' : '✗ ' + d.detail;
+      out.style.color = d.ok ? 'var(--ok)' : 'var(--err)';
+    } catch (e) {
+      out.textContent = '✗ ' + e; out.style.color = 'var(--err)';
+    }
+  });
+</script>
+{% endblock %}

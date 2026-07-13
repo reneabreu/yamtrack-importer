@@ -1,0 +1,13 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+data/
+tv time/
+*.zip
+.env
+tmdb_cache.json
+migration_report.json
+push_failures.log
+yamtrack_import.csv
+README.md

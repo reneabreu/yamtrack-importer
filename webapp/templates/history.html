@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Run history</h1>
+<p class="sub">Past migrations, newest first. Re-open a summary or re-download its CSV
+without reprocessing.</p>
+
+{% if not records %}
+  <div class="card"><span class="hint">No runs yet.</span></div>
+{% else %}
+<div class="card">
+  <table>
+    <tr><th>When</th><th>Source</th><th>Mode</th><th>Rows</th><th>Matched</th><th></th></tr>
+    {% for r in records %}
+    <tr>
+      <td>{{ r.when }}</td>
+      <td>{{ r.source }}</td>
+      <td>{{ r.mode }}</td>
+      <td>{{ r.rows }}</td>
+      <td>{{ r.matched }}/{{ r.total }}</td>
+      <td>
+        <a href="{{ url_for('result', job_id=r.id) }}">Summary</a>
+        {% if r.has_csv %} · <a href="{{ url_for('download', job_id=r.id) }}">CSV</a>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

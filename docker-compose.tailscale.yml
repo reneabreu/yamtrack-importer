@@ -1,0 +1,49 @@
+# Run the migration app as a node ON your Tailscale network, so it can reach a
+# Yamtrack instance that's only accessible over Tailscale (e.g. http://100.x.y.z:port).
+# Works on OrbStack / Docker Desktop / Linux.
+#
+#   1. Create a Tailscale auth key: https://login.tailscale.com/admin/settings/keys
+#      (a reusable + ephemeral key is convenient).
+#   2. Put it in .env as  TS_AUTHKEY=tskey-auth-xxxx
+#   3. docker compose -f docker-compose.tailscale.yml up -d --build
+#   4. Open http://localhost:8080, and in Settings use your Yamtrack Tailscale URL.
+#
+# The app container shares the tailscale container's network namespace, so the
+# UI is published on the tailscale service below.
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: yamtrack-migrate-ts
+    hostname: yamtrack-migrate
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY:?Set TS_AUTHKEY in .env}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_HOSTNAME=yamtrack-migrate
+      - TS_ACCEPT_DNS=true          # resolve *.ts.net MagicDNS names too
+      # CRITICAL: kernel networking (not userspace), so the app sharing this
+      # network namespace gets a real tailscale0 interface and can route to 100.x.
+      - TS_USERSPACE=false
+    volumes:
+      - ./data/tailscale:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ports:
+      - "8080:8080"                 # the app (shared namespace) reachable on your Mac
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: yamtrack-migrate:latest
+    network_mode: service:tailscale  # join the tailscale node's network
+    depends_on:
+      - tailscale
+    volumes:
+      - ./data:/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-change-me}
+      - MAX_UPLOAD_MB=200
+    restart: unless-stopped

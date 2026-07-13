@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Migrate to Yamtrack</h1>
+<p class="sub">Convert data from another service into your Yamtrack library.</p>
+
+{% if not has_tmdb %}
+  <div class="flash err">
+    No TMDB API key set. Add one on the <a href="{{ url_for('settings_view') }}">Settings page</a>
+    before running a TV/movie migration.
+  </div>
+{% endif %}
+
+<form id="migrate-form" method="post" action="{{ url_for('start') }}" enctype="multipart/form-data">
+  <div class="card">
+    <label>Source</label>
+    <div class="src-list">
+      {% for s in sources %}
+        <label class="src {{ 'planned' if not s.status == 'ready' else '' }}">
+          <input type="radio" name="source" value="{{ s.id }}"
+                 {{ 'disabled' if s.status != 'ready' }}
+                 {{ 'checked' if s.status == 'ready' and loop.first }}>
+          <span class="name">{{ s.label }}</span>
+          <span class="pill {{ 'ready' if s.status == 'ready' }}">{{ s.status }}</span>
+          <div class="note">{{ s.note }}</div>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% for s in sources if s.status == 'ready' %}
+  <div class="card source-inputs" id="inputs-{{ s.id }}" data-include="{{ '1' if s.has_include_options else '0' }}">
+    {% for inp in s.inputs %}
+      <label>{{ inp.label }}</label>
+      {% if inp.help %}<span class="hint">{{ inp.help|safe }}</span>{% endif %}
+      {% if inp.kind == 'file' %}
+        <input type="file" name="input__{{ inp.key }}" accept="{{ inp.accept }}" style="margin-top:8px">
+      {% elif inp.kind == 'password' %}
+        <input type="password" name="input__{{ inp.key }}" autocomplete="off" style="margin-top:8px">
+      {% else %}
+        <input type="text" name="input__{{ inp.key }}" style="margin-top:8px">
+      {% endif %}
+    {% endfor %}
+
+    {% if s.id == 'crunchyroll' %}
+      {% if cr_cookie_remembered %}
+        <span class="hint" style="color:var(--ok)">✓ Cookie remembered this session — leave the field blank to refresh.</span>
+      {% endif %}
+      <div class="checks" style="margin-top:8px">
+        <label><input type="checkbox" name="cr_reuse">
+          Reuse last fetch <span class="hint">(skip Crunchyroll — for re-running after edits)</span></label>
+      </div>
+    {% endif %}
+
+    {% if s.has_include_options %}
+    <label style="margin-top:18px">Include</label>
+    <div class="checks">
+      <label><input type="checkbox" name="include_shows" checked> TV shows &amp; episodes</label>
+      <label><input type="checkbox" name="include_movies" checked> Movies</label>
+      <label><input type="checkbox" name="include_watchlist" checked> Watchlist (Planning)</label>
+      <label><input type="checkbox" name="include_ratings" checked> Ratings</label>
+      <label><input type="checkbox" name="include_anime_as_anime" checked>
+        Route anime to MyAnimeList <span class="hint">(anime import as Yamtrack anime, not TV)</span></label>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <div class="card">
+    <label>What to do</label>
+    <div class="checks">
+      <label><input type="radio" name="mode" value="csv" checked>
+        Download a Yamtrack import CSV <span class="hint">(recommended — upload via Yamtrack → Settings → Import)</span></label>
+      <label><input type="radio" name="mode" value="push">
+        Push directly to the Yamtrack API
+        {% if not has_yamtrack %}<span class="hint">(needs Yamtrack URL + key in Settings)</span>{% endif %}</label>
+      <label style="margin-left:24px"><input type="checkbox" name="dry_run"> Dry run (push: resolve only, don’t write)</label>
+    </div>
+  </div>
+
+  <button type="submit" id="run-btn">Run migration</button>
+</form>
+
+<div class="card" id="progress-panel" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <label style="margin:0" id="phase-label">Starting…</label>
+    <span class="hint" id="count-label"></span>
+  </div>
+  <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
+  <pre id="log" class="log"></pre>
+  <div id="done-actions" style="display:none;margin-top:12px">
+    <a class="btn" id="download-link" href="#" style="display:none">Download CSV</a>
+    <a class="btn" id="result-link" href="#">View summary</a>
+    <button type="button" class="secondary" onclick="location.reload()">Run another</button>
+  </div>
+</div>
+
+<style>
+  .bar{height:10px;background:var(--card2);border:1px solid var(--line);
+    border-radius:6px;overflow:hidden;margin:12px 0}
+  .bar-fill{height:100%;width:0;background:var(--accent);transition:width .2s}
+  .bar-fill.push{background:var(--ok)}
+  .log{background:#0b0d11;border:1px solid var(--line);border-radius:8px;
+    padding:12px;max-height:280px;overflow:auto;font-size:12.5px;color:#c7d0dd;
+    white-space:pre-wrap;margin:0}
+  .log .warn{color:#f0c674}
+  .log .err{color:var(--err)}
+</style>
+
+<script>
+(function () {
+  const form = document.getElementById('migrate-form');
+  const panel = document.getElementById('progress-panel');
+  const bar = document.getElementById('bar-fill');
+  const phaseLabel = document.getElementById('phase-label');
+  const countLabel = document.getElementById('count-label');
+  const log = document.getElementById('log');
+  const runBtn = document.getElementById('run-btn');
+  const doneActions = document.getElementById('done-actions');
+  const resultLink = document.getElementById('result-link');
+
+  // Show only the selected source's input card.
+  function syncSourceInputs() {
+    const sel = form.querySelector('input[name="source"]:checked');
+    const id = sel ? sel.value : null;
+    document.querySelectorAll('.source-inputs').forEach(function (el) {
+      el.style.display = (el.id === 'inputs-' + id) ? '' : 'none';
+    });
+  }
+  form.querySelectorAll('input[name="source"]').forEach(function (r) {
+    r.addEventListener('change', syncSourceInputs);
+  });
+  syncSourceInputs();
+
+  function addLog(msg) {
+    const line = document.createElement('div');
+    if (msg.indexOf('⚠') !== -1) line.className = 'warn';
+    if (msg.indexOf('✗') !== -1) line.className = 'err';
+    line.textContent = msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    runBtn.disabled = true;
+    runBtn.textContent = 'Working…';
+    panel.style.display = 'block';
+    doneActions.style.display = 'none';
+    log.textContent = '';
+    bar.style.width = '0';
+
+    let res;
+    try {
+      res = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+    } catch (err) {
+      addLog('Network error starting job: ' + err); resetBtn(); return;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.job_id) {
+      addLog('Error: ' + (data.error || res.statusText)); resetBtn(); return;
+    }
+
+    const es = new EventSource('/progress/' + data.job_id);
+    es.onmessage = function (ev) {
+      const m = JSON.parse(ev.data);
+      if (m.type === 'log') {
+        addLog(m.msg);
+      } else if (m.type === 'progress') {
+        const pct = m.total ? Math.round(m.current / m.total * 100) : 0;
+        bar.style.width = pct + '%';
+        bar.className = 'bar-fill' + (m.phase === 'push' ? ' push' : '');
+        phaseLabel.textContent = m.phase === 'push' ? 'Pushing to Yamtrack' : 'Resolving titles';
+        countLabel.textContent = m.current + ' / ' + m.total + ' (' + pct + '%)';
+      } else if (m.type === 'done') {
+        es.close();
+        bar.style.width = '100%';
+        phaseLabel.textContent = 'Complete';
+        addLog('✓ Finished.');
+        doneActions.style.display = 'block';
+        const summary = m.summary || {};
+        resultLink.textContent = 'View summary';
+        resultLink.href = '/result/' + data.job_id;
+        const dl = document.getElementById('download-link');
+        if (summary.download) {
+          dl.href = '/download/' + data.job_id;
+          dl.style.display = '';
+          resultLink.className = 'btn secondary';
+          window.location = '/download/' + data.job_id;   // auto-start download
+        } else {
+          dl.style.display = 'none';
+          resultLink.className = 'btn';
+        }
+      } else if (m.type === 'error') {
+        es.close();
+        addLog('✗ ' + m.msg);
+        phaseLabel.textContent = 'Failed';
+        resetBtn();
+      }
+    };
+    es.onerror = function () { es.close(); resetBtn(); };
+  });
+
+  function resetBtn() {
+    runBtn.disabled = false;
+    runBtn.textContent = 'Run migration';
+  }
+})();
+</script>
+{% endblock %}

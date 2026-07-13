@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Migration summary</h1>
+<p class="sub">
+  {% if mode == 'csv' %}CSV generated.
+  {% elif push and push.dry_run %}Dry run — nothing was written.
+  {% else %}Push complete.{% endif %}
+</p>
+
+<div class="card">
+  <table>
+    <tr><th>Shows matched</th><td>{{ report.shows_matched }} / {{ report.shows_total }}</td></tr>
+    <tr><th>Movies matched</th><td>{{ report.movies_matched }} / {{ report.movies_total }}</td></tr>
+    <tr><th>Rows generated</th><td>{{ report.rows }} — {{ report.row_counts_by_type }}</td></tr>
+    {% if report.anime_rerouted %}
+    <tr><th>Anime → MyAnimeList</th><td>{{ report.anime_rerouted }}</td></tr>
+    {% endif %}
+    {% if report.episodes_skipped %}
+    <tr><th>Episodes skipped</th><td>{{ report.episodes_skipped }} (TVDB↔TMDB numbering)</td></tr>
+    {% endif %}
+    {% if push %}
+    <tr><th>Created</th><td>{{ push.created }}</td></tr>
+    <tr><th>Skipped (already present)</th><td>{{ push.skipped }}</td></tr>
+    <tr><th>Failed</th><td>{{ push.failed }}</td></tr>
+    {% endif %}
+  </table>
+  {% if download %}
+    <a class="btn" href="{{ url_for('download', job_id=job_id) }}" style="margin-top:14px">Download CSV</a>
+  {% endif %}
+</div>
+
+{% if report.numbering_mismatches %}
+<div class="card">
+  <label>Shows with skipped episodes ({{ report.numbering_mismatches|length }})</label>
+  <span class="hint">TV Time uses TheTVDB episode numbering; these shows are numbered
+    differently on TMDB (usually anime or long-runners), so mismatched episodes were
+    skipped to avoid import errors. The show itself is still added. For anime, a
+    MyAnimeList-based import will map episodes correctly.</span>
+  <table>
+    <tr><th>Show</th><th>Episodes skipped</th></tr>
+    {% for m in report.numbering_mismatches %}
+    <tr><td>{{ m.title }}</td><td>{{ m.skipped }}</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% set unmatched = report.unmatched_shows + report.unmatched_movies %}
+{% if unmatched %}
+<form class="card" method="post" action="{{ url_for('save_overrides') }}">
+  <label>Fix unmatched titles ({{ unmatched|length }})</label>
+  <span class="hint">Click a title to find it, copy the numeric id from the URL
+    (TMDB <code>/tv/<b>1234</b></code> or <code>/movie/<b>1234</b></code>; MyAnimeList
+    <code>/anime/<b>1234</b></code>), paste it, and Save. Then re-run — matched
+    items are cached, so it's quick.</span>
+  <table>
+    <tr><th>Type</th><th>Title</th><th>State</th><th>Last date</th><th>ID</th></tr>
+    {% for u in unmatched %}
+    <tr>
+      <td>{{ u.kind }}</td>
+      <td><a href="{{ u.search_url }}" target="_blank" rel="noopener">{{ u.title }} ↗</a></td>
+      <td>{{ u.state }}</td>
+      <td>{{ u.date }}</td>
+      <td>
+        <input type="hidden" name="ovr_key" value="{{ u.override_key }}">
+        <input type="hidden" name="ovr_title" value="{{ u.title }}">
+        <input type="text" name="ovr_id" inputmode="numeric" placeholder="id"
+               style="width:110px;padding:6px 8px">
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <button type="submit" style="margin-top:12px">Save overrides</button>
+</form>
+{% endif %}
+
+{% if push and push.failures %}
+<div class="card">
+  <label>First errors</label>
+  <table>{% for f in push.failures %}<tr><td>{{ f }}</td></tr>{% endfor %}</table>
+</div>
+{% endif %}
+
+<a class="btn" href="{{ url_for('index') }}">Run another</a>
+{% endblock %}

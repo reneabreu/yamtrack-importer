@@ -1,0 +1,16 @@
+.env
+.DS_Store
+mal_cache.json
+overrides.json
+overrides.template.json
+crunchyroll_history.json
+tmdb_cache.json
+tmdb_cache.json.tmp
+migration_report.json
+push_failures.log
+yamtrack_import.csv
+__pycache__/
+*.pyc
+tv time/
+*.zip
+data/
