@@ -128,17 +128,27 @@
       <input type="hidden" name="exporter" value="{{ default_exporter }}">
       {% endif %}
 
+      <script>
+        window.EXPORTERS = {
+          {% for e in exporters %}"{{ e.id }}": {"modes": {{ e.modes|tojson }},
+            "ext": "{{ e.output_ext|upper }}", "file_hint": {{ e.file_hint|tojson }},
+            "api_hint": {{ e.api_hint|tojson }}, "label": {{ e.label|tojson }}}{{ "," if not loop.last }}{% endfor %}
+        };
+        window.HAS_YAMTRACK = {{ 'true' if has_yamtrack else 'false' }};
+      </script>
+
       <div class="mode-grid">
-        <label class="mode">
-          <span class="mode-head"><input type="radio" name="mode" value="csv" checked> Download CSV</span>
-          <span class="hint">Recommended — upload via Yamtrack → Settings → Import</span>
+        <label class="mode" id="mode-file">
+          <span class="mode-head"><input type="radio" name="mode" value="csv" checked>
+            <span id="mode-file-label">Download CSV</span></span>
+          <span class="hint" id="mode-file-hint">Recommended — upload via Yamtrack → Settings → Import</span>
         </label>
-        <label class="mode">
+        <label class="mode" id="mode-api">
           <span class="mode-head"><input type="radio" name="mode" value="push"> Push to API</span>
-          <span class="hint">Direct import to your instance{% if not has_yamtrack %} — needs URL + key in Settings{% endif %}</span>
+          <span class="hint" id="mode-api-hint">Direct import to your instance</span>
         </label>
       </div>
-      <label class="dry"><input type="checkbox" name="dry_run">
+      <label class="dry" id="dry-row"><input type="checkbox" name="dry_run">
         Dry run <span class="hint">(push: resolve only, don't write)</span></label>
 
       <div class="review">
@@ -294,12 +304,43 @@
   wizard.querySelectorAll('.back').forEach(b => b.addEventListener('click', () => go(cur - 1)));
   stps.forEach(s => s.addEventListener('click', () => { const n = +s.dataset.for; if (n < cur) go(n); }));
 
+  // Adapt the Output step to the chosen destination's capabilities.
+  function currentExporter() {
+    const el = form.querySelector('[name="exporter"]');
+    return el ? el.value : null;
+  }
+  function syncExporter() {
+    const info = (window.EXPORTERS || {})[currentExporter()];
+    if (!info) return;
+    document.getElementById('mode-file-label').textContent = 'Download ' + info.ext;
+    document.getElementById('mode-file-hint').textContent =
+      info.file_hint || ('Save a ' + info.ext + ' file');
+    const hasApi = info.modes.indexOf('api') !== -1;
+    document.getElementById('mode-api').style.display = hasApi ? '' : 'none';
+    const apiHint = document.getElementById('mode-api-hint');
+    apiHint.textContent = (info.api_hint || 'Direct import') +
+      (hasApi && !window.HAS_YAMTRACK ? ' — needs URL + key in Settings' : '');
+    if (!hasApi) {
+      form.querySelector('input[name="mode"][value="csv"]').checked = true;
+      document.getElementById('dry-row').style.display = 'none';
+    } else {
+      document.getElementById('dry-row').style.display = '';
+    }
+    const dl = document.getElementById('download-link');
+    if (dl) dl.textContent = '↓ Download ' + info.ext;
+  }
+  const exporterSelect = document.getElementById('exporter-select');
+  if (exporterSelect) exporterSelect.addEventListener('change', syncExporter);
+
   function fillReview() {
     const sel = form.querySelector('input[name="source"]:checked');
     const name = sel ? sel.closest('.src').querySelector('.name').textContent.trim() : '—';
     document.getElementById('rv-source').textContent = name;
+    const info = (window.EXPORTERS || {})[currentExporter()] || {ext: 'CSV', label: ''};
     const mode = form.querySelector('input[name="mode"]:checked');
-    document.getElementById('rv-mode').textContent = (mode && mode.value === 'push') ? 'Push to API' : 'CSV file';
+    document.getElementById('rv-mode').textContent =
+      (mode && mode.value === 'push') ? ('Push to ' + info.label)
+                                      : (info.label + ' · ' + info.ext + ' file');
   }
 
   // Show only the selected source's input block.
@@ -312,6 +353,7 @@
   }
   form.querySelectorAll('input[name="source"]').forEach(r => r.addEventListener('change', syncSourceInputs));
   syncSourceInputs();
+  syncExporter();
   render();
 
   // ---- progress / SSE (unchanged contract) ----

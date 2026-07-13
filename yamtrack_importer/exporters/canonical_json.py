@@ -45,6 +45,7 @@ class CanonicalJSONExporter(Exporter):
         requires={},                 # no external id resolution needed
         output_ext="json",
         output_mime="application/json",
+        file_hint="Portable canonical export — the neutral data as JSON",
     )
 
     def build(self, items):

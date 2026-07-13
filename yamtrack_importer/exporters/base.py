@@ -18,6 +18,8 @@ class ExporterInfo:
     requires: dict[str, str] = field(default_factory=dict)
     output_ext: str = "csv"
     output_mime: str = "text/csv"
+    file_hint: str = ""     # UI hint for the file-download mode
+    api_hint: str = ""      # UI hint for the API-push mode
 
 
 class Exporter:

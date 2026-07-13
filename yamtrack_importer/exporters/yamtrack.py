@@ -21,6 +21,8 @@ class YamtrackExporter(Exporter):
         requires={"tv": "tmdb", "movie": "tmdb", "anime": "mal"},
         output_ext="csv",
         output_mime="text/csv",
+        file_hint="Recommended — upload via Yamtrack → Settings → Import",
+        api_hint="Direct import to your Yamtrack instance",
     )
 
     def details(self, records):

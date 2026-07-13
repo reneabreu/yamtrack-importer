@@ -190,9 +190,11 @@ def start():
     if not source.info.ready:
         return jsonify(error=f"{source.info.label} is not available yet."), 400
     try:
-        get_exporter(exporter_id)
+        exporter = get_exporter(exporter_id)
     except KeyError:
         return jsonify(error="Unknown destination."), 400
+    if mode == "push" and "api" not in exporter.info.modes:
+        return jsonify(error=f"{exporter.info.label} has no API mode — choose a file download."), 400
 
     settings = config.load_settings()
     options = {
