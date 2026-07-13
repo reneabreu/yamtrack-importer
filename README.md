@@ -3,6 +3,7 @@
 [![CI](https://github.com/reneabreu/yamtrack-importer/actions/workflows/ci.yml/badge.svg)](https://github.com/reneabreu/yamtrack-importer/actions/workflows/ci.yml)
 [![Publish image](https://github.com/reneabreu/yamtrack-importer/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/reneabreu/yamtrack-importer/actions/workflows/docker-publish.yml)
 [![ghcr.io](https://img.shields.io/badge/ghcr.io-yamtrack--importer-blue?logo=docker)](https://github.com/reneabreu/yamtrack-importer/pkgs/container/yamtrack-importer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Import your TV, movie, and anime watch history into
 [Yamtrack](https://github.com/FuzzyGrim/Yamtrack) — from a growing list of
@@ -298,3 +299,12 @@ optional `tag` input defaults to `latest`.
   with no request timeout to accommodate long pushes.)
 - Nothing is sent anywhere except TMDB (for matching) and your own Yamtrack
   instance. Your export never leaves your machine otherwise.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) — PRs welcome, CI runs on every PR.
+
+## License
+
+[MIT](LICENSE) © Rene Abreu. Not affiliated with Yamtrack, TV Time, Crunchyroll,
+TMDB, or MyAnimeList.
