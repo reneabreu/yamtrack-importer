@@ -33,6 +33,7 @@ class SourceInfo:
     yamtrack_types: list[str]         # e.g. ["tv", "movie"]
     metadata_provider: str            # "tmdb" | "igdb" | "openlibrary" | ...
     note: str = ""
+    beta: bool = False                # show a "beta" tag in the UI
     inputs: list[SourceInput] = field(default_factory=list)
 
     @property

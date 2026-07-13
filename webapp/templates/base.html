@@ -27,11 +27,7 @@
     header{display:flex;align-items:center;justify-content:space-between;
       padding:15px 26px;border-bottom:1px solid var(--line);background:var(--card)}
     .brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:16px}
-    .filmstrip{width:26px;height:22px;border-radius:5px;overflow:hidden;
-      background:linear-gradient(#2a2f3a,#1c2027);border:1px solid var(--line3);
-      display:flex;align-items:flex-end}
-    .filmstrip i{height:6px;width:100%;
-      background:repeating-linear-gradient(90deg,var(--accent) 0 3px,transparent 3px 6px)}
+    .brand svg{display:block;flex:none}
     header nav{display:flex;align-items:center;gap:22px;font-size:14px}
     header nav a{color:var(--mut);padding-bottom:4px}
     header nav a:hover{color:var(--txt)}
@@ -81,7 +77,16 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span class="filmstrip"><i></i></span> Yamtrack Importer</div>
+    <a class="brand" href="{{ url_for('index') }}" style="color:var(--txt)">
+      <svg width="28" height="28" viewBox="0 0 46 46" fill="none" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="43" height="43" rx="12" fill="#0f131a" stroke="#262b34"/>
+        <rect x="9" y="15" width="13" height="17" rx="2.5" fill="#2b3a55" stroke="#4f8cff" stroke-width="1.5"/>
+        <rect x="14" y="12" width="13" height="17" rx="2.5" fill="#101725" stroke="#8fb4ff" stroke-width="1.5"/>
+        <path d="M18.5 17 24 20.5l-5.5 3.5z" fill="#e9ebf0"/>
+        <path d="M30 23h7m0 0-3-3m3 3-3 3" stroke="#8fb4ff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Yamtrack Importer
+    </a>
     <nav>
       <a href="{{ url_for('index') }}" class="{{ 'active' if active == 'migrate' }}">Migrate</a>
       <a href="{{ url_for('history') }}" class="{{ 'active' if active == 'history' }}">History</a>

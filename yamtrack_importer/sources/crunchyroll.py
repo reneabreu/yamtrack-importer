@@ -50,7 +50,8 @@ class CrunchyrollSource(Source):
         status="ready",
         yamtrack_types=["anime"],
         metadata_provider="mal",
-        note="Anime watch history → Yamtrack anime (matched to MyAnimeList). Beta.",
+        beta=True,
+        note="Anime watch history → Yamtrack anime (matched to MyAnimeList).",
         inputs=[
             SourceInput(
                 key="etp_rt",
