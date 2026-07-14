@@ -1,4 +1,4 @@
-"""Crunchyroll source (beta): watch history -> canonical anime MediaItems."""
+"""Crunchyroll source: watch history -> canonical anime MediaItems."""
 
 from __future__ import annotations
 
@@ -39,7 +39,6 @@ class CrunchyrollSource(Source):
         label="Crunchyroll",
         status="ready",
         media_types=["anime"],
-        beta=True,
         note="Anime watch history → anime (matched to MyAnimeList).",
         inputs=[
             SourceInput(

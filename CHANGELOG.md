@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Crunchyroll promoted out of beta** to a ready source after live validation;
+  dropped the beta tag in the UI and docs.
+
 ### Added
 
 - **Unit tests + CI test step**: regression coverage for the TV Time parser, the

@@ -268,7 +268,7 @@ take priority.
 - `tmdb_cache.json` — resolution cache (safe to keep; makes re-runs instant)
 - `migration_report.json` — match stats and unmatched list
 
-## Crunchyroll (beta)
+## Crunchyroll
 
 Imports your Crunchyroll watch history as Yamtrack **anime** (source
 MyAnimeList), which is the right media type for anime — unlike the TV Time path,
@@ -283,12 +283,12 @@ which forces anime through TMDB's TV numbering.
 
 Notes and caveats:
 
-- **Beta.** The auth + history flow matches the actively-maintained
-  `crunchyexporter-cli` and `crunchyroll-downloader` projects (public web client
-  `noaihdevm_6iyg0a8l0q`, `etp_rt_cookie` grant, `/content/v2/{account}/watch-history`).
-  Crunchyroll's API is private, so if auth starts failing, grab a fresh `etp_rt`
-  (it expires with your browser session); the client id and endpoints live at the
-  top of `yamtrack_importer/crunchyroll.py` if Crunchyroll ever rotates them.
+- The auth + history flow matches the actively-maintained `crunchyexporter-cli`
+  and `crunchyroll-downloader` projects (public web client `noaihdevm_6iyg0a8l0q`,
+  `etp_rt_cookie` grant, `/content/v2/{account}/watch-history`). Crunchyroll's API
+  is private, so if auth starts failing, grab a fresh `etp_rt` (it expires with
+  your browser session); the client id and endpoints live at the top of
+  `yamtrack_importer/crunchyroll.py` if Crunchyroll ever rotates them.
 - Titles are matched to MAL by name (Crunchyroll doesn't expose MAL ids).
   Unmatched series appear on the result page with a MAL search link and an
   `overrides.json` scaffold (`anime:<title>` → `{"mal_id": …}`).

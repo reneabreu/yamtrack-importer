@@ -96,7 +96,7 @@ this can grow incrementally without a rewrite.
 | Source | Status | Yamtrack type | Matching |
 |--------|--------|---------------|----------|
 | TV Time | ✅ ready | tv, movie | TheTVDB id → TMDB |
-| Crunchyroll | 🧪 beta | anime | title → MAL (Jikan) |
+| Crunchyroll | ✅ ready | anime | title → MAL (Jikan/official) |
 | Netflix | planned | tv, movie | title + year → TMDB |
 | HBO Max | planned | tv, movie | title + year → TMDB |
 | Apple TV | planned | tv, movie | title + year → TMDB |
