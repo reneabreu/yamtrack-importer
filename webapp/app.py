@@ -11,6 +11,7 @@ import json
 import os
 import tempfile
 import zipfile
+from datetime import datetime
 
 from flask import (
     Flask,
@@ -26,6 +27,7 @@ from flask import (
 )
 
 from yamtrack_importer.core.library import Library
+from yamtrack_importer.core.model import Status
 from yamtrack_importer.core.pipeline import export_library, run_with_library
 from yamtrack_importer.exporters.registry import DEFAULT_EXPORTER, all_exporters, get_exporter
 from yamtrack_importer.mal import MALResolver
@@ -352,32 +354,136 @@ def history():
     return render_template("history.html", records=records)
 
 
+def _library_row(key: str, it) -> dict:
+    """Flatten a MediaItem into the fields the library/tracker table renders."""
+    episodic = bool(it.episodes)
+    return {
+        "key": key,
+        "type": it.media_type.value,
+        "title": it.title,
+        "year": it.year or "",
+        "progress": it.watched_episodes if episodic else (it.progress or 0),
+        "total": it.total or "",
+        "episodic": episodic,
+        "rewatches": it.total_rewatches if episodic else it.repeats,
+        "repeats": it.repeats,  # editable flat rewatch counter
+        "status": it.status.value,
+        "score": ("%g" % it.score) if it.score is not None else "",
+        "favorite": it.favorite,
+        "notes": it.notes or "",
+        "started_at": it.started_at.date().isoformat() if it.started_at else "",
+        "completed_at": it.completed_at.date().isoformat() if it.completed_at else "",
+        "sources": it.sources,
+    }
+
+
 @app.route("/library")
 def library_view():
-    """Show the merged local library — every source deduped into one collection."""
+    """Browse + edit the merged local library, optionally filtered by status."""
     exporters = list(all_exporters())
+    status_arg = request.args.get("status") or ""
+    try:
+        status_filter = Status(status_arg) if status_arg else None
+    except ValueError:
+        status_filter, status_arg = None, ""
     library = Library(config.LIBRARY_PATH)
     try:
-        items = library.all_items()
+        pairs = library.items_with_keys(status_filter)
         counts = library.counts_by_type()
+        status_counts = library.counts_by_status()
         total = library.count()
         # how many titles changed since each exporter's last export
         changed = {e.info.id: len(library.changed_since_snapshot(e.info.id)[0])
                    for e in exporters}
     finally:
         library.close()
-    # Reuse the canonical exporter's per-title summary for the review table.
-    json_exp = get_exporter("json")
-    details = json_exp.details(json_exp.build(items))
-    # provenance chips per title (type+title -> sources)
-    prov = {(it.media_type.value, it.title): it.sources for it in items}
-    for d in details:
-        d["sources"] = prov.get((d["type"], d["title"]), [])
+    rows = [_library_row(key, it) for key, it in pairs]
     return render_template(
         "library.html",
-        details=details, counts=counts, total=total,
+        rows=rows, counts=counts, status_counts=status_counts,
+        total=total, shown=len(rows), status=status_arg,
+        statuses=[s.value for s in Status],
         exporters=[e.info for e in exporters], changed=changed,
     )
+
+
+def _back_to_library():
+    """Redirect to the library, preserving the status filter the edit came from."""
+    status = request.form.get("return_status") or None
+    return redirect(url_for("library_view", status=status))
+
+
+def _parse_date(raw: str | None):
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+@app.route("/library/edit", methods=["POST"])
+def library_edit():
+    """Persist an edit to a single library title (keyed by identity in the form)."""
+    key = request.form.get("key", "")
+    try:
+        status = Status(request.form.get("status", ""))
+    except ValueError:
+        flash("Invalid status.", "err")
+        return _back_to_library()
+
+    score_raw = request.form.get("score", "").strip()
+    score = None
+    if score_raw:
+        try:
+            score = max(0.0, min(10.0, float(score_raw)))
+        except ValueError:
+            flash("Score must be a number between 0 and 10.", "err")
+            return _back_to_library()
+
+    rep_raw = request.form.get("repeats", "").strip()
+    try:
+        repeats = max(0, int(rep_raw)) if rep_raw else 0
+    except ValueError:
+        flash("Rewatches must be a whole number.", "err")
+        return _back_to_library()
+
+    fields = {
+        "status": status,
+        "score": score,
+        "repeats": repeats,
+        "started_at": _parse_date(request.form.get("started_at")),
+        "completed_at": _parse_date(request.form.get("completed_at")),
+        "favorite": request.form.get("favorite") == "on",
+        "notes": request.form.get("notes", "").strip(),
+    }
+    library = Library(config.LIBRARY_PATH)
+    try:
+        library.update_item(key, **fields)
+    except KeyError:
+        flash("That title is no longer in the library.", "err")
+        return _back_to_library()
+    finally:
+        library.close()
+    flash("Saved changes.", "ok")
+    return _back_to_library()
+
+
+@app.route("/library/delete", methods=["POST"])
+def library_delete():
+    """Remove a single library title (keyed by identity in the form)."""
+    key = request.form.get("key", "")
+    library = Library(config.LIBRARY_PATH)
+    try:
+        existed = library.delete_item(key)
+    finally:
+        library.close()
+    if existed:
+        flash("Removed the title.", "ok")
+    else:
+        flash("That title was already gone.", "err")
+    return _back_to_library()
 
 
 @app.route("/library/export/<exporter_id>")
