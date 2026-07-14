@@ -7,9 +7,10 @@ new sources, bug fixes, docs — are welcome.
 
 1. Fork and create a branch off `main`.
 2. Make your change (see **Local development** below).
-3. Open a **pull request**. CI byte-compiles the code and runs an import/route
-   smoke test on every PR; doc-only changes skip CI. The Docker image is never
-   built from a PR — it's only published on a release (see **Releasing**).
+3. Open a **pull request**. CI byte-compiles the code, runs the unit tests, and
+   runs an import/route smoke test on every PR; doc-only changes skip CI. The
+   Docker image is never built from a PR — it's only published on a release
+   (see **Releasing**).
 
 Keep PRs focused, and update `README.md` / `ROADMAP.md` when behavior changes and
 add a note under **Unreleased** in [CHANGELOG.md](CHANGELOG.md).
@@ -36,6 +37,7 @@ Run the same checks CI runs before pushing:
 
 ```bash
 python -m compileall -q migrate.py yamtrack_importer webapp
+for t in tests/test_*.py; do python "$t"; done   # unit tests (no network)
 DATA_DIR=/tmp/yi-dev python - <<'PY'
 import webapp.app as app
 from yamtrack_importer.sources.registry import all_sources

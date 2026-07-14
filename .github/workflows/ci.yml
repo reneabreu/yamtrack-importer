@@ -34,6 +34,13 @@ jobs:
       - name: Byte-compile all modules
         run: python -m compileall -q migrate.py yamtrack_importer webapp
 
+      - name: Run unit tests
+        run: |
+          for t in tests/test_*.py; do
+            echo "== $t =="
+            python "$t"
+          done
+
       - name: Import + source registry smoke test
         env:
           DATA_DIR: /tmp/ci-data
@@ -44,7 +51,7 @@ jobs:
           ids = [s.info.id for s in all_sources()]
           assert "tvtime" in ids and "crunchyroll" in ids, ids
           client = app.app.test_client()
-          for path in ("/", "/history", "/settings"):
+          for path in ("/", "/library", "/history", "/settings"):
               assert client.get(path).status_code == 200, path
           print("OK — sources:", ids)
           PY

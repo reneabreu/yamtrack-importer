@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unit tests + CI test step**: regression coverage for the TV Time parser, the
+  source→canonical mapping, the Yamtrack row mapping, the anime reroute + episode
+  validation, the library merge/dedup/delta logic, and MAL provider selection —
+  all offline with synthetic fixtures. CI now runs them on every PR.
 - **Configurable storage roots**: `CONFIG_DIR` (settings/overrides), `DATA_DIR`
   (library.db + history), and `MEDIA_DIR` (TMDB/MAL/Crunchyroll lookup cache),
   each overridable by env var and independently mountable. All default to
