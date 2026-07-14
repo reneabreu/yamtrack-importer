@@ -16,3 +16,7 @@ __pycache__/
 tv time/
 *.zip
 data/
+
+# Local mirror of PRIVATE Gitea issues — never publish to the public GitHub
+# mirror. Gitea stays the source of truth; this dir is a per-machine cache.
+.issues-tea/

@@ -1,0 +1,5 @@
+{
+  "issueTracker": "gitea",
+  "issueSyncCmd": "tea-issue-sync",
+  "issueDir": ".issues-tea"
+}
