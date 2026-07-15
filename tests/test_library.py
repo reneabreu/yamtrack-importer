@@ -122,6 +122,93 @@ def test_delta_is_per_exporter():
         assert rep["changed_titles"] == 1
 
 
+def test_update_item_edits_fields():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([_anime("Frieren", "52991", progress=10, total=28)])
+        key = identity(_anime("Frieren", "52991"))
+        updated = lib.update_item(
+            key, status=Status.COMPLETED, score=9.5, repeats=2,
+            started_at=datetime(2024, 1, 1), completed_at=datetime(2024, 3, 1),
+            favorite=True, notes="banger",
+        )
+        assert updated.status == Status.COMPLETED and updated.score == 9.5
+        # persisted, not just returned in memory
+        reread = lib.get_item(key)
+        assert reread.status == Status.COMPLETED
+        assert reread.score == 9.5
+        assert reread.repeats == 2
+        assert reread.completed_at == datetime(2024, 3, 1)
+        assert reread.favorite is True
+        assert reread.notes == "banger"
+        # untouched fields survive
+        assert reread.progress == 10 and reread.total == 28
+
+
+def test_update_item_rejects_unknown_field():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([_anime("Frieren", "52991")])
+        key = identity(_anime("Frieren", "52991"))
+        try:
+            lib.update_item(key, title="Hacked")   # title is not user-editable here
+            assert False, "expected ValueError"
+        except ValueError:
+            pass
+
+
+def test_update_item_missing_key_raises():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        try:
+            lib.update_item("anime:mal:99999", status=Status.DROPPED)
+            assert False, "expected KeyError"
+        except KeyError:
+            pass
+
+
+def test_delete_item():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([_anime("Frieren", "52991"), _anime("Bocchi", "50416")])
+        key = identity(_anime("Frieren", "52991"))
+        assert lib.delete_item(key) is True
+        assert lib.get_item(key) is None
+        assert lib.count() == 1
+        # deleting again is a no-op, reported as False
+        assert lib.delete_item(key) is False
+
+
+def test_items_with_keys_and_status_filter():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([
+            _anime("Frieren", "52991", status=Status.COMPLETED),
+            _anime("Bocchi", "50416", status=Status.IN_PROGRESS),
+        ])
+        pairs = lib.items_with_keys()
+        assert {k for k, _ in pairs} == {"anime:mal:52991", "anime:mal:50416"}
+        done = lib.items_with_keys(Status.COMPLETED)
+        assert [it.title for _, it in done] == ["Frieren"]
+        assert lib.counts_by_status()["in_progress"] == 1
+        assert lib.counts_by_status()["completed"] == 1
+
+
+def test_edit_shows_up_in_delta_export():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    yex = get_exporter("yamtrack")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.MOVIE, "Film", ids={"tmdb": "2"},
+                              status=Status.IN_PROGRESS)])
+        export_library(lib, yex)                       # baseline
+        _, rep = export_library(lib, yex, delta=True)
+        assert rep["changed_titles"] == 0
+        # a manual edit flips the fingerprint -> the title reappears in the delta
+        lib.update_item("movie:tmdb:2", status=Status.COMPLETED, score=8.0)
+        _, rep = export_library(lib, yex, delta=True)
+        assert rep["changed_titles"] == 1
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

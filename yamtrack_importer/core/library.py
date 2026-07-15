@@ -174,6 +174,27 @@ class Library:
         rows = self._conn.execute("SELECT data FROM items ORDER BY media_type, title").fetchall()
         return [item_from_json(json.loads(r["data"])) for r in rows]
 
+    def items_with_keys(self, status: Status | None = None) -> list[tuple[str, MediaItem]]:
+        """(identity-key, item) pairs, ordered, optionally filtered by status.
+
+        The key is the stable row id (:func:`identity`); the tracker UI needs it
+        to target a specific title for edit/delete.
+        """
+        rows = self._conn.execute(
+            "SELECT key, data FROM items ORDER BY media_type, title"
+        ).fetchall()
+        out = []
+        for r in rows:
+            it = item_from_json(json.loads(r["data"]))
+            if status is not None and it.status != status:
+                continue
+            out.append((r["key"], it))
+        return out
+
+    def get_item(self, key: str) -> MediaItem | None:
+        row = self._conn.execute("SELECT data FROM items WHERE key=?", (key,)).fetchone()
+        return item_from_json(json.loads(row["data"])) if row else None
+
     def count(self) -> int:
         return self._conn.execute("SELECT COUNT(*) AS n FROM items").fetchone()["n"]
 
@@ -182,6 +203,50 @@ class Library:
             "SELECT media_type, COUNT(*) AS n FROM items GROUP BY media_type"
         ).fetchall()
         return {r["media_type"]: r["n"] for r in rows}
+
+    def counts_by_status(self) -> dict:
+        """{status-value: count} across the whole library, for the status views."""
+        out = {s.value: 0 for s in Status}
+        for it in self.all_items():
+            out[it.status.value] = out.get(it.status.value, 0) + 1
+        return out
+
+    # ---- write (tracker edits) ----
+    # Fields a user may edit on a stored title. Provenance, ids, episodes, and
+    # identity stay owned by import/merge; edits here never change the row key.
+    EDITABLE_FIELDS = frozenset(
+        {"status", "score", "repeats", "started_at", "completed_at", "favorite", "notes"}
+    )
+
+    def update_item(self, key: str, **fields) -> MediaItem:
+        """Apply edited fields to the stored title and persist it.
+
+        Values must already be the right type (``Status``, ``float``/``None``,
+        ``int``, ``datetime``/``None``, ``bool``, ``str``); the web layer coerces
+        form strings before calling this. Raises ``KeyError`` if the title does
+        not exist and ``ValueError`` for any field outside ``EDITABLE_FIELDS``.
+        """
+        bad = set(fields) - self.EDITABLE_FIELDS
+        if bad:
+            raise ValueError(f"not editable: {', '.join(sorted(bad))}")
+        it = self.get_item(key)
+        if it is None:
+            raise KeyError(key)
+        for name, value in fields.items():
+            setattr(it, name, value)
+        self._conn.execute(
+            "UPDATE items SET title=?, data=?, updated_at=? WHERE key=?",
+            (it.title, json.dumps(item_to_json(it), ensure_ascii=False),
+             datetime.utcnow().isoformat(), key),
+        )
+        self._conn.commit()
+        return it
+
+    def delete_item(self, key: str) -> bool:
+        """Remove a title. Returns True if a row was deleted, False if absent."""
+        cur = self._conn.execute("DELETE FROM items WHERE key=?", (key,))
+        self._conn.commit()
+        return cur.rowcount > 0
 
     def clear(self) -> int:
         n = self.count()
