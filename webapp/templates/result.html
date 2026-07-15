@@ -5,9 +5,10 @@
 <div class="result-head">
   <span class="ok-badge">✓</span>
   <div>
-    <h2>Migration complete</h2>
+    <h2>{% if mode == 'library' %}Added to your library{% else %}Migration complete{% endif %}</h2>
     <p class="sub" style="margin:0">
-      {% if report.library %}Merged into your library — {{ report.rows }} rows ready to import into Yamtrack.
+      {% if mode == 'library' %}Ingested into your tracker — {{ report.ingest.total }} titles in your library now. Nothing to download.
+      {% elif report.library %}Merged into your library — {{ report.rows }} rows ready to import into Yamtrack.
       {% elif mode == 'csv' %}CSV generated — {{ report.rows }} rows ready to import into Yamtrack.
       {% elif push and push.dry_run %}Dry run — nothing was written.
       {% else %}Push complete — written to your Yamtrack instance.{% endif %}
@@ -127,8 +128,8 @@
 {% endif %}
 
 <div style="display:flex;gap:12px;flex-wrap:wrap">
+  {% if report.library %}<a class="btn{{ '' if mode == 'library' else ' secondary' }}" href="{{ url_for('library_view') }}">View library</a>{% endif %}
   <a class="btn secondary" href="{{ url_for('index') }}">Run another</a>
-  {% if report.library %}<a class="btn secondary" href="{{ url_for('library_view') }}">View library</a>{% endif %}
 </div>
 
 <style>

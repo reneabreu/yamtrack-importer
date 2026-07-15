@@ -116,14 +116,16 @@
       <p class="sub">Choose a destination and output, review the run, and start the migration.</p>
 
       {% if exporters and exporters|length > 1 %}
-      <label>Destination</label>
-      <select name="exporter" id="exporter-select"
-              style="width:100%;max-width:320px;margin:6px 0 18px;padding:9px 11px;
-                     background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px">
-        {% for e in exporters %}
-          <option value="{{ e.id }}" {{ 'selected' if e.id == default_exporter }}>{{ e.label }}</option>
-        {% endfor %}
-      </select>
+      <div id="dest-row">
+        <label>Destination</label>
+        <select name="exporter" id="exporter-select"
+                style="width:100%;max-width:320px;margin:6px 0 18px;padding:9px 11px;
+                       background:var(--card2);color:var(--txt);border:1px solid var(--line);border-radius:8px">
+          {% for e in exporters %}
+            <option value="{{ e.id }}" {{ 'selected' if e.id == default_exporter }}>{{ e.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
       {% else %}
       <input type="hidden" name="exporter" value="{{ default_exporter }}">
       {% endif %}
@@ -137,10 +139,15 @@
       </script>
 
       <div class="mode-grid">
+        <label class="mode" id="mode-library">
+          <span class="mode-head"><input type="radio" name="mode" value="library" checked>
+            Add to my library</span>
+          <span class="hint">Recommended — ingest into your tracker, nothing to download</span>
+        </label>
         <label class="mode" id="mode-file">
-          <span class="mode-head"><input type="radio" name="mode" value="csv" checked>
+          <span class="mode-head"><input type="radio" name="mode" value="csv">
             <span id="mode-file-label">Download CSV</span></span>
-          <span class="hint" id="mode-file-hint">Recommended — upload via Yamtrack → Settings → Import</span>
+          <span class="hint" id="mode-file-hint">Save a file to import into Yamtrack yourself</span>
         </label>
         <label class="mode" id="mode-api">
           <span class="mode-head"><input type="radio" name="mode" value="push"> Push to API</span>
@@ -176,6 +183,7 @@
     <div class="bar"><div class="bar-fill" id="bar-fill"></div></div>
     <pre id="log" class="log mono"></pre>
     <div id="done-actions" style="display:none;margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <a class="btn" id="library-link" href="{{ url_for('library_view') }}" style="display:none">View library</a>
       <a class="btn" id="download-link" href="#" style="display:none">↓ Download CSV</a>
       <a class="btn" id="result-link" href="#">View summary</a>
       <button type="button" class="secondary" onclick="location.reload()">Run another</button>
@@ -235,7 +243,7 @@
   .incl.wide{grid-column:1 / -1}
 
   /* output modes */
-  .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .mode-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:12px}
   .mode{display:flex;flex-direction:column;gap:5px;background:var(--card2);
     border:1px solid var(--line2);border-radius:12px;padding:14px 15px;cursor:pointer;margin:0}
   .mode:has(input:checked){background:var(--accent-soft);border-color:var(--accent)}
@@ -308,37 +316,54 @@
     const el = form.querySelector('[name="exporter"]');
     return el ? el.value : null;
   }
+  function currentMode() {
+    const m = form.querySelector('input[name="mode"]:checked');
+    return m ? m.value : 'library';
+  }
+  // Show/hide the destination + dry-run rows for the chosen output mode.
+  function syncMode() {
+    const mode = currentMode();
+    const dest = document.getElementById('dest-row');
+    if (dest) dest.style.display = (mode === 'library') ? 'none' : '';
+    const dry = document.getElementById('dry-row');
+    if (dry) dry.style.display = (mode === 'push') ? '' : 'none';
+    fillReview();
+  }
   function syncExporter() {
     const info = (window.EXPORTERS || {})[currentExporter()];
     if (!info) return;
     document.getElementById('mode-file-label').textContent = 'Download ' + info.ext;
     document.getElementById('mode-file-hint').textContent =
-      info.file_hint || ('Save a ' + info.ext + ' file');
+      info.file_hint || ('Save a ' + info.ext + ' file to import yourself');
     const hasApi = info.modes.indexOf('api') !== -1;
     document.getElementById('mode-api').style.display = hasApi ? '' : 'none';
     const apiHint = document.getElementById('mode-api-hint');
     apiHint.textContent = info.api_hint || 'Direct import';
-    if (!hasApi) {
-      form.querySelector('input[name="mode"][value="csv"]').checked = true;
-      document.getElementById('dry-row').style.display = 'none';
-    } else {
-      document.getElementById('dry-row').style.display = '';
+    // If push is no longer available but was selected, fall back to library.
+    if (!hasApi && currentMode() === 'push') {
+      form.querySelector('input[name="mode"][value="library"]').checked = true;
     }
     const dl = document.getElementById('download-link');
     if (dl) dl.textContent = '↓ Download ' + info.ext;
+    syncMode();
   }
   const exporterSelect = document.getElementById('exporter-select');
   if (exporterSelect) exporterSelect.addEventListener('change', syncExporter);
+  form.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', syncMode));
 
   function fillReview() {
     const sel = form.querySelector('input[name="source"]:checked');
     const name = sel ? sel.closest('.src').querySelector('.name').textContent.trim() : '—';
     document.getElementById('rv-source').textContent = name;
+    const mode = currentMode();
+    if (mode === 'library') {
+      document.getElementById('rv-mode').textContent = 'My library (no file)';
+      return;
+    }
     const info = (window.EXPORTERS || {})[currentExporter()] || {ext: 'CSV', label: ''};
-    const mode = form.querySelector('input[name="mode"]:checked');
     document.getElementById('rv-mode').textContent =
-      (mode && mode.value === 'push') ? ('Push to ' + info.label)
-                                      : (info.label + ' · ' + info.ext + ' file');
+      (mode === 'push') ? ('Push to ' + info.label)
+                        : (info.label + ' · ' + info.ext + ' file');
   }
 
   // Show only the selected source's input block.
@@ -419,11 +444,19 @@
         resultLink.textContent = 'View summary';
         resultLink.href = '/result/' + data.job_id;
         const dl = document.getElementById('download-link');
+        const lib = document.getElementById('library-link');
+        lib.style.display = 'none';
         if (summary.download) {
           dl.href = '/download/' + data.job_id;
           dl.style.display = '';
           resultLink.className = 'btn secondary';
           window.location = '/download/' + data.job_id;
+        } else if (summary.mode === 'library') {
+          // Just ingested — no file. Send the user to their library.
+          dl.style.display = 'none';
+          lib.style.display = '';
+          lib.className = 'btn';
+          resultLink.className = 'btn secondary';
         } else {
           dl.style.display = 'none';
           resultLink.className = 'btn';

@@ -237,9 +237,11 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
     providers = _build_providers(settings)
     options = {**options, "data_dir": config.DATA_DIR, "media_dir": config.MEDIA_DIR}
 
-    if mode == "csv":
-        # Ingest this source into the persistent library (dedup/merge), then
-        # export the whole library so the file reflects every source combined.
+    if mode in ("csv", "library"):
+        # Ingest this source into the persistent library (dedup/merge). For csv
+        # we then export the whole library to a downloadable file; for
+        # library-only we stop after ingest — no file, no download — so the user
+        # can just review the result in the Library view.
         library = Library(config.LIBRARY_PATH)
         try:
             rows, report = run_with_library(
@@ -247,6 +249,11 @@ def _run_migration(job, source, files, settings, options, mode, dry_run, work_di
             )
         finally:
             library.close()
+        if mode == "library":
+            job.summary = {"mode": "library", "report": report, "download": False}
+            job.emit(type="log",
+                     msg=f"Added to your library — {report['ingest']['total']} titles total.")
+            return
         ext = exporter.info.output_ext
         out_path = os.path.join(work_dir, f"library_{exporter.info.id}_import.{ext}")
         exporter.write(rows, out_path)
