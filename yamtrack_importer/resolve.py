@@ -200,6 +200,37 @@ class TMDBResolver:
             "note": "matched by title search",
         }
 
+    # ---- full detail (for the content page) --------------------------
+    # Cached under "detail:" keys in the same store; the resolution paths only
+    # read their own tv:/movie:/anime: keys, so these never collide.
+    def _detail(self, cache_key: str, fetch):
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+        data = fetch()
+        if data:  # don't cache a failed/empty lookup — retry it next time
+            self.cache[cache_key] = data
+            self.save_cache()
+        return data
+
+    def tv_detail(self, tmdb_id: int) -> dict | None:
+        return self._detail(
+            f"detail:tv:{tmdb_id}",
+            lambda: self._get(f"/tv/{tmdb_id}", {"append_to_response": "recommendations"}),
+        )
+
+    def movie_detail(self, tmdb_id: int) -> dict | None:
+        return self._detail(
+            f"detail:movie:{tmdb_id}",
+            lambda: self._get(f"/movie/{tmdb_id}", {"append_to_response": "recommendations"}),
+        )
+
+    def tv_season(self, tmdb_id: int, season: int) -> dict | None:
+        return self._detail(
+            f"detail:tv:{tmdb_id}:s{season}",
+            lambda: self._get(f"/tv/{tmdb_id}/season/{season}"),
+        )
+
 
 def _best_title_match(
     name: str, results: list[dict], key: str, alt_key: str, year: int | None = None

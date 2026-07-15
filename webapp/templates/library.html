@@ -52,7 +52,7 @@
   <details class="lib-row" data-title="{{ d.title|lower }}">
     <summary>
       <span class="kind kind-{{ d.type }}">{{ d.type }}</span>
-      <span class="r-title" title="{{ d.title }}">{{ d.title }}{% if d.year %} <span class="yr">({{ d.year }})</span>{% endif %}</span>
+      <span class="r-title" title="{{ d.title }}"><a class="title-link" href="{{ url_for('content_page', key=d.key) }}" onclick="event.stopPropagation()">{{ d.title }}</a>{% if d.year %} <span class="yr">({{ d.year }})</span>{% endif %}</span>
       {% if d.favorite %}<span class="fav" title="Favorite">★</span>{% endif %}
       <span class="badge st-{{ d.status }}">{{ slabels[d.status] }}</span>
       <span class="r-meta mono" title="Progress">{{ d.progress }}{% if d.total %}/{{ d.total }}{% endif %}</span>
@@ -90,6 +90,7 @@
         </label>
         <div class="row-actions">
           <button type="submit" class="btn">Save</button>
+          <a class="btn secondary" href="{{ url_for('content_page', key=d.key) }}">View details →</a>
           {% if d.sources %}<span class="src-wrap">{% for s in d.sources %}<span class="src-chip">{{ s }}</span>{% endfor %}</span>{% endif %}
         </div>
       </form>
@@ -146,6 +147,8 @@
   .lib-row>summary::-webkit-details-marker{display:none}
   .lib-row>summary:hover{background:var(--card2)}
   .r-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-title .title-link{color:var(--txt);text-decoration:none}
+  .r-title .title-link:hover{color:var(--accent-b);text-decoration:underline}
   .r-title .yr{color:var(--mut);font-size:12px}
   .fav{color:#ffcf4d;font-size:13px}
   .r-meta{text-align:right}

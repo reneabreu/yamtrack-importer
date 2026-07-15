@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% set active = 'library' %}
+{% block body %}
+
+<a class="back-link" href="{{ url_for('library_view') }}">← Back to library</a>
+
+{% if error %}
+<div class="card err-card">
+  <h1 style="margin-top:0">{{ item.title }}</h1>
+  <p class="hint" style="margin:0 0 16px">{{ error }}</p>
+  {% if 'TMDB' in error %}<a class="btn" href="{{ url_for('settings_view') }}">Open Settings</a>{% endif %}
+</div>
+{% else %}
+
+<div class="content-head">
+  <div class="cover">
+    {% if detail.cover %}
+      <img src="{{ detail.cover }}" alt="{{ detail.name }} cover" referrerpolicy="no-referrer">
+    {% else %}
+      <div class="cover-ph"><span class="kind kind-{{ detail.kind }}">{{ detail.kind }}</span></div>
+    {% endif %}
+  </div>
+  <div class="info">
+    <span class="kind kind-{{ detail.kind }}">{{ detail.kind }}</span>
+    <h1>{{ detail.name }}{% if detail.year %} <span class="year">({{ detail.year }})</span>{% endif %}</h1>
+    {% if detail.original_name and detail.original_name != detail.name %}
+      <div class="orig">{{ detail.original_name }}</div>
+    {% endif %}
+    <div class="chips">
+      <span class="badge st-{{ item.status }}">{{ slabels[item.status] }}</span>
+      {% if item.score %}<span class="chip">★ {{ item.score }}</span>{% endif %}
+      {% if item.favorite %}<span class="chip fav">♥ Favorite</span>{% endif %}
+      {% if detail.episodes_total %}<span class="chip mono">{{ detail.watched_total }}/{{ detail.episodes_total }} eps</span>{% endif %}
+      {% if item.repeats %}<span class="chip mono">↻ {{ item.repeats }}</span>{% endif %}
+    </div>
+    {% if detail.description %}<p class="desc">{{ detail.description }}</p>{% endif %}
+    <a class="prov" href="{{ detail.provider_url }}" target="_blank" rel="noopener">
+      View on {{ 'MyAnimeList' if detail.provider == 'mal' else 'TMDB' }} ↗</a>
+  </div>
+</div>
+
+{% if detail.seasons %}
+<section class="block">
+  <h2>Episodes</h2>
+  <div class="seasons" data-key="{{ key }}">
+    {% for s in detail.seasons %}
+    <div class="season">
+      <button class="season-head" data-season="{{ s.number }}" type="button" aria-expanded="false">
+        <span class="chev">▸</span>
+        <span class="s-name">{{ s.name }}</span>
+        <span class="s-prog mono">{{ s.watched }}/{{ s.episode_count }}</span>
+        <span class="s-bar"><span style="width:{{ (100 * s.watched / s.episode_count)|round(0) if s.episode_count else 0 }}%"></span></span>
+      </button>
+      <div class="eps" hidden></div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if detail.related %}
+<section class="block">
+  <h2>Related</h2>
+  <div class="rel-row">
+    {% for r in detail.related %}
+    <a class="rel" href="{{ r.url }}" target="_blank" rel="noopener" title="{{ r.name }}">
+      {% if r.cover %}<img src="{{ r.cover }}" alt="" referrerpolicy="no-referrer" loading="lazy">
+      {% else %}<div class="rel-ph"></div>{% endif %}
+      <span class="rel-name">{{ r.name }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endif %}
+
+<style>
+  .back-link{display:inline-block;color:var(--mut);text-decoration:none;font-size:13.5px;margin-bottom:18px}
+  .back-link:hover{color:var(--txt)}
+  .err-card{padding:26px}
+
+  .content-head{display:grid;grid-template-columns:220px 1fr;gap:26px;margin-bottom:8px}
+  .cover img,.cover-ph{width:220px;aspect-ratio:2/3;border-radius:12px;object-fit:cover;
+    border:1px solid var(--line);background:var(--card2);display:block}
+  .cover-ph{display:flex;align-items:center;justify-content:center}
+  .info h1{margin:8px 0 2px;font-size:26px;line-height:1.2}
+  .info h1 .year{color:var(--mut);font-weight:400;font-size:19px}
+  .orig{color:var(--mut);font-size:15px;margin-bottom:12px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
+  .badge{font-size:12px;border-radius:20px;padding:3px 11px;white-space:nowrap}
+  .st-in_progress{color:#8fb4ff;background:rgba(143,180,255,.14)}
+  .st-completed{color:#7fdca0;background:rgba(127,220,160,.14)}
+  .st-planning{color:#c9b6ff;background:rgba(201,182,255,.14)}
+  .st-paused{color:#ffc48f;background:rgba(255,196,143,.14)}
+  .st-dropped{color:#ff9a9a;background:rgba(255,154,154,.14)}
+  .chip{font-size:12.5px;color:var(--txt);background:var(--card2);border:1px solid var(--line);
+    border-radius:20px;padding:3px 11px}
+  .chip.fav{color:#ffcf4d}
+  .desc{font-size:14.5px;line-height:1.65;color:#c7d0dd;max-width:70ch;margin:0 0 16px}
+  .prov{color:var(--accent-b);text-decoration:none;font-size:13px}
+  .prov:hover{text-decoration:underline}
+  .kind{font-family:var(--mono);font-size:11px;border-radius:5px;padding:2px 7px}
+  .kind-tv{color:#8fb4ff;background:rgba(143,180,255,.12)}
+  .kind-movie{color:#ffc48f;background:rgba(255,196,143,.12)}
+  .kind-anime{color:#c9b6ff;background:rgba(201,182,255,.12)}
+
+  .block{margin-top:30px}
+  .block h2{font-size:16px;margin:0 0 12px}
+
+  .seasons{display:flex;flex-direction:column;gap:8px}
+  .season{border:1px solid var(--line);border-radius:10px;background:var(--card);overflow:hidden}
+  .season-head{width:100%;display:grid;grid-template-columns:20px 1fr auto 120px;gap:12px;
+    align-items:center;background:none;border:0;color:var(--txt);cursor:pointer;
+    padding:12px 14px;font-size:14px;text-align:left;font-family:inherit}
+  .season-head:hover{background:var(--card2)}
+  .season-head .chev{color:var(--mut);transition:transform .15s}
+  .season-head.open .chev{transform:rotate(90deg)}
+  .s-prog{color:var(--mut);font-size:12.5px}
+  .s-bar{height:6px;border-radius:4px;background:var(--card2);overflow:hidden}
+  .s-bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-b))}
+  .eps{border-top:1px solid var(--line);max-height:420px;overflow:auto}
+  .ep{display:grid;grid-template-columns:48px 1fr 100px 24px;gap:10px;align-items:center;
+    padding:9px 16px;font-size:13.5px;border-top:1px solid var(--card2)}
+  .ep:first-child{border-top:0}
+  .ep.seen{color:var(--txt)}
+  .ep:not(.seen){color:var(--mut)}
+  .ep-n{color:var(--mut)}
+  .ep-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ep-c{color:var(--ok);text-align:center}
+  .ep-loading{padding:14px 16px;color:var(--mut);font-size:13px}
+
+  .rel-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:14px}
+  .rel{text-decoration:none;color:var(--txt)}
+  .rel img,.rel-ph{width:100%;aspect-ratio:2/3;border-radius:9px;object-fit:cover;
+    border:1px solid var(--line);background:var(--card2);display:block}
+  .rel-name{display:block;font-size:12.5px;margin-top:6px;line-height:1.35;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .rel:hover .rel-name{color:var(--accent-b)}
+
+  @media (max-width:640px){
+    .content-head{grid-template-columns:120px 1fr;gap:16px}
+    .cover img,.cover-ph{width:120px}
+    .season-head{grid-template-columns:20px 1fr auto}
+    .season-head .s-bar{display:none}
+  }
+</style>
+
+<script>
+(function () {
+  const wrap = document.querySelector('.seasons');
+  if (!wrap) return;
+  const key = wrap.dataset.key;
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+  wrap.querySelectorAll('.season-head').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const panel = btn.nextElementSibling;
+      const isOpen = !panel.hidden;
+      btn.classList.toggle('open', !isOpen);
+      btn.setAttribute('aria-expanded', String(!isOpen));
+      if (isOpen) { panel.hidden = true; return; }
+      panel.hidden = false;
+      if (panel.dataset.loaded) return;
+      panel.innerHTML = '<div class="ep-loading">Loading…</div>';
+      fetch('/title/season?key=' + encodeURIComponent(key) + '&season=' + encodeURIComponent(btn.dataset.season))
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          const eps = d.episodes || [];
+          if (!eps.length) { panel.innerHTML = '<div class="ep-loading">No episode list available.</div>'; return; }
+          panel.innerHTML = eps.map(function (e) {
+            return '<div class="ep' + (e.watched ? ' seen' : '') + '">'
+              + '<span class="ep-n mono">' + (e.number != null ? e.number : '') + '</span>'
+              + '<span class="ep-t">' + (e.title ? escapeHtml(e.title) : '—') + '</span>'
+              + '<span class="ep-d mono">' + (e.aired || '') + '</span>'
+              + '<span class="ep-c">' + (e.watched ? '✓' : '') + '</span>'
+              + '</div>';
+          }).join('');
+          panel.dataset.loaded = '1';
+        })
+        .catch(function () { panel.innerHTML = '<div class="ep-loading">Couldn’t load episodes.</div>'; });
+    });
+  });
+})();
+</script>
+{% endblock %}

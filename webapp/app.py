@@ -26,6 +26,7 @@ from flask import (
     url_for,
 )
 
+from yamtrack_importer.core.detail import get_detail, get_season_episodes
 from yamtrack_importer.core.library import Library
 from yamtrack_importer.core.model import Status
 from yamtrack_importer.core.pipeline import export_library, run_with_library
@@ -412,6 +413,60 @@ def library_view():
         statuses=[s.value for s in Status],
         exporters=[e.info for e in exporters], changed=changed,
     )
+
+
+def _content_item(it) -> dict:
+    """The user's tracked fields to show alongside the fetched metadata."""
+    return {
+        "type": it.media_type.value,
+        "title": it.title,
+        "status": it.status.value,
+        "score": ("%g" % it.score) if it.score is not None else None,
+        "favorite": it.favorite,
+        "repeats": it.repeats,
+        "watched": it.watched_episodes if it.episodes else (it.progress or 0),
+    }
+
+
+@app.route("/title")
+def content_page():
+    """Rich detail page for a single library title (cover, synopsis, episodes…)."""
+    key = request.args.get("key", "")
+    library = Library(config.LIBRARY_PATH)
+    try:
+        item = library.get_item(key)
+    finally:
+        library.close()
+    if item is None:
+        flash("That title isn't in your library.", "err")
+        return redirect(url_for("library_view"))
+    providers = _build_providers(config.load_settings())
+    detail, error = get_detail(item, providers)
+    slabels = {"in_progress": "Watching", "planning": "Plan to watch",
+               "completed": "Completed", "paused": "Paused", "dropped": "Dropped"}
+    return render_template(
+        "content.html", key=key, item=_content_item(item),
+        detail=detail, error=error, slabels=slabels,
+    )
+
+
+@app.route("/title/season")
+def content_season():
+    """Lazy JSON: the full episode list for one season of a title."""
+    key = request.args.get("key", "")
+    try:
+        season = int(request.args.get("season", "1"))
+    except ValueError:
+        return jsonify(error="bad season"), 400
+    library = Library(config.LIBRARY_PATH)
+    try:
+        item = library.get_item(key)
+    finally:
+        library.close()
+    if item is None:
+        return jsonify(error="not found"), 404
+    providers = _build_providers(config.load_settings())
+    return jsonify(episodes=get_season_episodes(item, providers, season))
 
 
 def _back_to_library():

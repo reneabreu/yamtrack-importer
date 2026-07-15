@@ -114,6 +114,43 @@ class MALResolver:
         info = (got or {}).get("data") or {}
         return {"title": info.get("title"), "episodes": info.get("episodes")}
 
+    # ---- full detail (for the content page) --------------------------
+    # Jikan is used even when a Client ID is set: its public payload carries the
+    # artwork, synopsis, japanese title and relations the content page needs.
+    # Cached under "detail:" keys; the resolution path only reads "anime:" keys.
+    def _cached(self, cache_key: str, fetch):
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+        data = fetch()
+        # Only cache truthy results: an empty list/None means the lookup failed
+        # or was rate-limited (Jikan 504s a lot), and we want to retry next time
+        # rather than pin a permanent "nothing here".
+        if data:
+            self.cache[cache_key] = data
+            self.save_cache()
+        return data
+
+    def anime_detail(self, mal_id: int) -> dict | None:
+        return self._cached(
+            f"detail:anime:{mal_id}",
+            lambda: (self._jikan_get(f"/anime/{mal_id}", {}) or {}).get("data"),
+        )
+
+    def anime_recommendations(self, mal_id: int) -> list:
+        return self._cached(
+            f"detail:anime:{mal_id}:recs",
+            lambda: (self._jikan_get(f"/anime/{mal_id}/recommendations", {}) or {}).get("data") or [],
+        ) or []
+
+    def anime_episodes(self, mal_id: int) -> list:
+        # Jikan paginates episodes; page 1 (up to 100) is enough for the vast
+        # majority of anime. Cached so expanding a season is instant next time.
+        return self._cached(
+            f"detail:anime:{mal_id}:eps",
+            lambda: (self._jikan_get(f"/anime/{mal_id}/episodes", {}) or {}).get("data") or [],
+        ) or []
+
     # ---- official MAL API ----
     def _mal_get(self, path: str, params: dict) -> dict | None:
         headers = {"X-MAL-CLIENT-ID": self.client_id}
