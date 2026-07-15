@@ -74,6 +74,13 @@
           <label>Score (0–10)
             <input type="number" name="score" min="0" max="10" step="0.1" value="{{ d.score }}">
           </label>
+          {% if d.type in ('tv', 'anime') %}
+          <label>Episodes watched
+            <input type="number" name="episodes_watched" min="0" {% if d.total %}max="{{ d.total }}"{% endif %}
+                   step="1" value="{{ d.progress }}"
+                   title="Sets your watched count; fills seasons in order. Tick individual episodes on the details page.">
+          </label>
+          {% endif %}
           <label>Rewatches
             <input type="number" name="repeats" min="0" step="1" value="{{ d.repeats }}">
           </label>

@@ -126,7 +126,13 @@
   .ep:not(.seen){color:var(--mut)}
   .ep-n{color:var(--mut)}
   .ep-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ep-c{color:var(--ok);text-align:center}
+  .ep-toggle{cursor:pointer;-webkit-user-select:none;user-select:none}
+  .ep-toggle:hover{background:var(--card2)}
+  .ep.busy{opacity:.55}
+  .ep-c{width:18px;height:18px;border-radius:50%;border:1px solid var(--line);
+    justify-self:center;line-height:16px;text-align:center;font-size:12px;color:transparent}
+  .ep.seen .ep-c{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+  .ep.seen .ep-c::after{content:"✓"}
   .ep-loading{padding:14px 16px;color:var(--mut);font-size:13px}
 
   .rel-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:14px}
@@ -167,18 +173,49 @@
           const eps = d.episodes || [];
           if (!eps.length) { panel.innerHTML = '<div class="ep-loading">No episode list available.</div>'; return; }
           panel.innerHTML = eps.map(function (e) {
-            return '<div class="ep' + (e.watched ? ' seen' : '') + '">'
-              + '<span class="ep-n mono">' + (e.number != null ? e.number : '') + '</span>'
+            const hasN = e.number != null;
+            return '<div class="ep' + (e.watched ? ' seen' : '') + (hasN ? ' ep-toggle' : '') + '"'
+              + (hasN ? ' data-number="' + e.number + '" title="Click to mark watched"' : '') + '>'
+              + '<span class="ep-n mono">' + (hasN ? e.number : '') + '</span>'
               + '<span class="ep-t">' + (e.title ? escapeHtml(e.title) : '—') + '</span>'
               + '<span class="ep-d mono">' + (e.aired || '') + '</span>'
-              + '<span class="ep-c">' + (e.watched ? '✓' : '') + '</span>'
+              + '<span class="ep-c" aria-hidden="true"></span>'
               + '</div>';
           }).join('');
           panel.dataset.loaded = '1';
+          panel.addEventListener('click', function (ev) {
+            const row = ev.target.closest('.ep-toggle');
+            if (row && !row.classList.contains('busy')) toggleEpisode(btn, row);
+          });
         })
         .catch(function () { panel.innerHTML = '<div class="ep-loading">Couldn’t load episodes.</div>'; });
     });
   });
+
+  function toggleEpisode(btn, row) {
+    const want = !row.classList.contains('seen');
+    row.classList.add('busy');
+    row.classList.toggle('seen', want);   // optimistic
+    fetch('/title/episode', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({key: key, season: Number(btn.dataset.season),
+                            number: Number(row.dataset.number), watched: want})
+    }).then(function (r) { return r.json(); })
+      .then(function (res) {
+        row.classList.remove('busy');
+        if (!res || !res.ok) { row.classList.toggle('seen', !want); return; }
+        updateSeasonProgress(btn, res.season_watched);
+      })
+      .catch(function () { row.classList.remove('busy'); row.classList.toggle('seen', !want); });
+  }
+
+  function updateSeasonProgress(btn, seasonWatched) {
+    const prog = btn.querySelector('.s-prog');
+    const total = Number((prog.textContent.split('/')[1] || '').trim()) || 0;
+    prog.textContent = seasonWatched + '/' + total;
+    const bar = btn.querySelector('.s-bar > span');
+    if (bar) bar.style.width = (total ? Math.round(100 * seasonWatched / total) : 0) + '%';
+  }
 })();
 </script>
 {% endblock %}

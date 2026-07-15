@@ -234,13 +234,77 @@ class Library:
             raise KeyError(key)
         for name, value in fields.items():
             setattr(it, name, value)
+        self._save(key, it)
+        return it
+
+    def _save(self, key: str, it: MediaItem) -> None:
         self._conn.execute(
             "UPDATE items SET title=?, data=?, updated_at=? WHERE key=?",
             (it.title, json.dumps(item_to_json(it), ensure_ascii=False),
              datetime.utcnow().isoformat(), key),
         )
         self._conn.commit()
+
+    def set_episode(self, key: str, season: int, number: int, watched: bool) -> dict:
+        """Mark a single episode watched/unwatched (per-episode toggle).
+
+        Adding reuses an existing ``EpisodeWatch`` if present (keeping its date /
+        rewatch count). Returns the fresh {watched_total, season_watched}.
+        """
+        it = self.get_item(key)
+        if it is None:
+            raise KeyError(key)
+        present = any(e.season == season and e.number == number for e in it.episodes)
+        if watched and not present:
+            it.episodes.append(EpisodeWatch(season, number))
+        elif not watched and present:
+            it.episodes = [e for e in it.episodes
+                           if not (e.season == season and e.number == number)]
+        it.episodes.sort(key=lambda e: (e.season, e.number))
+        self._save(key, it)
+        return {"watched_total": it.watched_episodes,
+                "season_watched": it.episodes_in_season(season)}
+
+    def set_watched_count(self, key: str, n: int) -> MediaItem:
+        """Set the number of watched episodes to ``n`` by filling episodes in
+        season order (a MAL-style quick progress set).
+
+        Existing ``EpisodeWatch`` entries are reused so watched dates and
+        per-episode rewatches survive. Season order/sizes come from
+        ``season_totals`` (skipping specials), else the existing episodes, else a
+        single unbounded season 1. Episodes become the source of truth, so the
+        flat ``progress`` scalar is cleared.
+        """
+        it = self.get_item(key)
+        if it is None:
+            raise KeyError(key)
+        n = max(0, n)
+        by_key = {(e.season, e.number): e for e in it.episodes}
+        target: list[EpisodeWatch] = []
+        remaining = n
+        for season, size in self._season_sizes(it):
+            if remaining <= 0:
+                break
+            take = min(size, remaining) if size else remaining  # 0 size = unbounded
+            for num in range(1, take + 1):
+                target.append(by_key.get((season, num)) or EpisodeWatch(season, num))
+            remaining -= take
+        it.episodes = sorted(target, key=lambda e: (e.season, e.number))
+        it.progress = None  # episodes now carry the watched count
+        self._save(key, it)
         return it
+
+    @staticmethod
+    def _season_sizes(it: MediaItem) -> list[tuple[int, int]]:
+        """[(season, aired_count), …] in fill order. A count of 0 means unbounded."""
+        if it.season_totals:
+            return [(s, it.season_totals[s]) for s in sorted(it.season_totals) if s != 0]
+        if it.episodes:
+            maxes: dict[int, int] = {}
+            for e in it.episodes:
+                maxes[e.season] = max(maxes.get(e.season, 0), e.number)
+            return [(s, maxes[s]) for s in sorted(maxes)]
+        return [(1, 0)]
 
     def delete_item(self, key: str) -> bool:
         """Remove a title. Returns True if a row was deleted, False if absent."""

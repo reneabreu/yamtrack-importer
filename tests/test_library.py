@@ -209,6 +209,71 @@ def test_edit_shows_up_in_delta_export():
         assert rep["changed_titles"] == 1
 
 
+def test_set_episode_toggle():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.TV, "Show", ids={"tmdb": "1"}, total=20,
+                              episodes=[EpisodeWatch(1, 1)])])
+        key = "tv:tmdb:1"
+        r = lib.set_episode(key, 1, 2, True)
+        assert r == {"watched_total": 2, "season_watched": 2}
+        assert {(e.season, e.number) for e in lib.get_item(key).episodes} == {(1, 1), (1, 2)}
+        # unwatch
+        r = lib.set_episode(key, 1, 1, False)
+        assert r["watched_total"] == 1
+        assert {(e.season, e.number) for e in lib.get_item(key).episodes} == {(1, 2)}
+        # marking an already-watched episode again is idempotent
+        assert lib.set_episode(key, 1, 2, True)["watched_total"] == 1
+
+
+def test_set_watched_count_fills_seasons_in_order():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.TV, "Show", ids={"tmdb": "1"}, total=18,
+                              season_totals={0: 5, 1: 10, 2: 8})])  # season 0 (specials) skipped
+        key = "tv:tmdb:1"
+        lib.set_watched_count(key, 13)   # 10 in S1 + 3 in S2
+        it = lib.get_item(key)
+        assert it.watched_episodes == 13
+        assert it.episodes_in_season(1) == 10
+        assert it.episodes_in_season(2) == 3
+        assert it.episodes_in_season(0) == 0
+        assert it.progress is None       # episodes are now the source of truth
+
+
+def test_set_watched_count_preserves_and_truncates():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        lib.ingest([MediaItem(MediaType.TV, "Show", ids={"tmdb": "1"}, total=10,
+                              season_totals={1: 10},
+                              episodes=[EpisodeWatch(1, 1, datetime(2020, 1, 1), repeats=2)])])
+        key = "tv:tmdb:1"
+        lib.set_watched_count(key, 3)
+        it = lib.get_item(key)
+        assert it.watched_episodes == 3
+        ep1 = next(e for e in it.episodes if e.number == 1)
+        assert ep1.watched_at == datetime(2020, 1, 1) and ep1.repeats == 2  # preserved
+        # lowering the count truncates from the end
+        lib.set_watched_count(key, 1)
+        it = lib.get_item(key)
+        assert [e.number for e in it.episodes] == [1]
+        assert next(e for e in it.episodes if e.number == 1).repeats == 2  # still preserved
+
+
+def test_set_watched_count_flat_anime_without_structure():
+    db = os.path.join(tempfile.mkdtemp(), "lib.db")
+    with Library(db) as lib:
+        # no episodes, no season_totals -> single unbounded season 1
+        lib.ingest([MediaItem(MediaType.ANIME, "Frieren", ids={"mal": "52991"},
+                              total=28, progress=0)])
+        key = "anime:mal:52991"
+        lib.set_watched_count(key, 12)
+        it = lib.get_item(key)
+        assert it.watched_episodes == 12
+        assert it.watched_seasons == [1]
+        assert it.progress is None
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

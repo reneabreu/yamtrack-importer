@@ -373,8 +373,10 @@ def _library_row(key: str, it) -> dict:
         "progress": it.watched_episodes if episodic else (it.progress or 0),
         "total": it.total or "",
         "episodic": episodic,
-        "rewatches": it.total_rewatches if episodic else it.repeats,
-        "repeats": it.repeats,  # editable flat rewatch counter
+        # Whole-title rewatch count — the same value the edit form controls, so
+        # row and form agree. Per-episode rewatch detail lives on the content page.
+        "rewatches": it.repeats,
+        "repeats": it.repeats,
         "status": it.status.value,
         "score": ("%g" % it.score) if it.score is not None else "",
         "favorite": it.favorite,
@@ -469,6 +471,27 @@ def content_season():
     return jsonify(episodes=get_season_episodes(item, providers, season))
 
 
+@app.route("/title/episode", methods=["POST"])
+def content_episode():
+    """Toggle one episode watched/unwatched from the content page."""
+    data = request.get_json(silent=True) or {}
+    key = data.get("key", "")
+    try:
+        season = int(data.get("season"))
+        number = int(data.get("number"))
+    except (TypeError, ValueError):
+        return jsonify(error="bad episode ref"), 400
+    watched = bool(data.get("watched"))
+    library = Library(config.LIBRARY_PATH)
+    try:
+        result = library.set_episode(key, season, number, watched)
+    except KeyError:
+        return jsonify(error="not found"), 404
+    finally:
+        library.close()
+    return jsonify(ok=True, **result)
+
+
 def _back_to_library():
     """Redirect to the library, preserving the status filter the edit came from."""
     status = request.form.get("return_status") or None
@@ -511,6 +534,17 @@ def library_edit():
         flash("Rewatches must be a whole number.", "err")
         return _back_to_library()
 
+    # Optional "Episodes watched" quick-set (tv/anime rows only). Absent field =
+    # leave episode progress untouched.
+    eps_raw = request.form.get("episodes_watched", "").strip()
+    episodes_watched = None
+    if eps_raw:
+        try:
+            episodes_watched = max(0, int(eps_raw))
+        except ValueError:
+            flash("Episodes watched must be a whole number.", "err")
+            return _back_to_library()
+
     fields = {
         "status": status,
         "score": score,
@@ -523,6 +557,8 @@ def library_edit():
     library = Library(config.LIBRARY_PATH)
     try:
         library.update_item(key, **fields)
+        if episodes_watched is not None:
+            library.set_watched_count(key, episodes_watched)
     except KeyError:
         flash("That title is no longer in the library.", "err")
         return _back_to_library()
